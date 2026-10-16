@@ -1,0 +1,23 @@
+{
+  "name": "babilon",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Babilon - Biblioteca Digital y Plataforma de Lectura y Preservación",
+  "scripts": {
+    "dev": "pnpm --filter @babilon/web dev",
+    "build:types": "pnpm --filter @babilon/shared-types build",
+    "build": "pnpm --filter @babilon/shared-types build && pnpm --filter @babilon/web build",
+    "start": "pnpm --filter @babilon/web start"
+  },
+  "keywords": [
+    "books",
+    "digital-library",
+    "nextjs",
+    "mongodb"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^10.0.5"
+  }
+}

@@ -1,0 +1,188 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700;800&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg-parchment: #FDFBF7;
+    --bg-card: #FFFFFF;
+    --border-warm: #E7DEC9;
+    --text-primary: #1E293B;
+    --text-muted: #64748B;
+    --accent-terracotta: #C85A32;
+    --accent-gold: #C59B27;
+  }
+
+  .dark {
+    --bg-parchment: #0A0C10;
+    --bg-card: #12151E;
+    --border-warm: rgba(226, 183, 116, 0.15);
+    --text-primary: #F3F4F6;
+    --text-muted: #9CA3AF;
+    --accent-terracotta: #D97856;
+    --accent-gold: #E5B367;
+  }
+
+  html {
+    background-color: var(--bg-parchment);
+  }
+
+  body {
+    background-color: var(--bg-parchment);
+    color: var(--text-primary);
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    min-height: 100vh;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+
+  h1,
+  h2,
+  h3,
+  .font-serif-title {
+    font-family: 'Newsreader', Georgia, serif;
+    letter-spacing: -0.02em;
+  }
+
+  ::selection {
+    background-color: #F7D9CC;
+    color: #943B1A;
+  }
+
+  .dark ::selection {
+    background-color: rgba(229, 179, 103, 0.3);
+    color: #E5B367;
+  }
+}
+
+/* ============================================= */
+/* Glass & Surface Effects                       */
+/* ============================================= */
+.glass-parchment {
+  background: rgba(253, 251, 247, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.dark .glass-parchment {
+  background: rgba(10, 12, 16, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+/* ============================================= */
+/* Card Shadow System                            */
+/* ============================================= */
+.book-card-shadow {
+  box-shadow: 0 4px 20px -2px rgba(42, 31, 23, 0.06), 0 2px 6px -1px rgba(42, 31, 23, 0.03);
+  transition: all 250ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.book-card-shadow:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 36px -4px rgba(42, 31, 23, 0.12), 0 6px 14px -2px rgba(42, 31, 23, 0.05);
+}
+
+.dark .book-card-shadow {
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.4), 0 2px 6px -1px rgba(0, 0, 0, 0.3);
+}
+
+.dark .book-card-shadow:hover {
+  box-shadow: 0 16px 36px -4px rgba(229, 179, 103, 0.08), 0 6px 14px -2px rgba(0, 0, 0, 0.4);
+}
+
+/* ============================================= */
+/* Grid Background Pattern                       */
+/* ============================================= */
+.bg-grid-pattern {
+  background-size: 32px 32px;
+  background-image:
+    linear-gradient(to right, rgba(231, 222, 201, 0.25) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(231, 222, 201, 0.25) 1px, transparent 1px);
+}
+
+.dark .bg-grid-pattern {
+  background-image:
+    linear-gradient(to right, rgba(226, 183, 116, 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(226, 183, 116, 0.06) 1px, transparent 1px);
+}
+
+/* Bridge the existing Tailwind palette to the app-level dark theme. */
+.dark .bg-white,
+.dark .bg-white\/70,
+.dark .bg-white\/95 {
+  background-color: var(--bg-card);
+}
+
+.dark .bg-parchment-50,
+.dark .bg-parchment-100,
+.dark .bg-parchment-100\/50,
+.dark .bg-parchment-100\/60 {
+  background-color: var(--bg-parchment);
+}
+
+.dark .bg-parchment-200 {
+  background-color: #1A1E2A;
+}
+
+.dark .border-parchment-200,
+.dark .border-parchment-300,
+.dark .border-parchment-300\/80 {
+  border-color: var(--border-warm);
+}
+
+.dark .text-ink-950,
+.dark .text-ink-900,
+.dark .text-ink-800,
+.dark .text-ink-700,
+.dark .text-ink-600 {
+  color: var(--text-primary);
+}
+
+.dark .text-ink-500,
+.dark .text-ink-400 {
+  color: var(--text-muted);
+}
+
+.dark .hover\:bg-parchment-100:hover {
+  background-color: #1A1E2A;
+}
+
+.dark .bg-gradient-to-b {
+  --tw-gradient-from: #12151E var(--tw-gradient-from-position);
+  --tw-gradient-via: #0A0C10 var(--tw-gradient-via-position);
+  --tw-gradient-to: #0A0C10 var(--tw-gradient-to-position);
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+/* ============================================= */
+/* Animations                                    */
+/* ============================================= */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease;
+}

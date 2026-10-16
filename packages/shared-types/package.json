@@ -1,0 +1,22 @@
+{
+  "name": "@babilon/shared-types",
+  "version": "1.0.0",
+  "description": "Tipos y modelos compartidos para Babilon (Libros, Autores, Reseñas, Usuarios)",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}
