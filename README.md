@@ -1,5 +1,4 @@
 # Babilon
-
 Babilon es una biblioteca digital para descubrir, preservar y leer obras literarias. La aplicación actual ofrece un portal web con catálogo, búsqueda, lectura paginada y carga de obras conectada directamente con MongoDB Atlas.
 
 ## Estado actual
