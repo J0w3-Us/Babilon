@@ -37,9 +37,9 @@ export default function ThemeToggle() {
       onClick={toggleTheme}
       aria-label={isDark ? 'Activar modo claro' : 'Activar modo oscuro'}
       title={isDark ? 'Modo claro' : 'Modo oscuro'}
-      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-parchment-300 text-ink-700 transition-colors hover:border-terracotta-400 hover:text-terracotta-600 dark:border-surface-400 dark:text-ink-100 dark:hover:border-academic-gold dark:hover:text-academic-gold"
+      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-stone-200 dark:border-surface-300 text-stone-700 dark:text-stone-300 transition-colors hover:border-stone-400 dark:hover:border-surface-400 hover:text-stone-900 dark:hover:text-stone-100 cursor-pointer"
     >
-      {isDark ? <Sun size={16} aria-hidden="true" /> : <Moon size={16} aria-hidden="true" />}
+      {isDark ? <Sun size={15} aria-hidden="true" /> : <Moon size={15} aria-hidden="true" />}
     </button>
   );
 }

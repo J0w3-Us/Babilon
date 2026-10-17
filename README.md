@@ -1,4 +1,5 @@
 # Babilon
+
 Babilon es una biblioteca digital para descubrir, preservar y leer obras literarias. La aplicación actual ofrece un portal web con catálogo, búsqueda, lectura paginada y carga de obras conectada directamente con MongoDB Atlas.
 
 ## Estado actual
@@ -74,13 +75,13 @@ La compilación genera primero los tipos compartidos y después la aplicación N
 
 Los Route Handlers de Next.js están disponibles en:
 
-| Método | Ruta | Uso |
-| --- | --- | --- |
-| `GET` | `/api/health` | Comprueba la aplicación y la conexión a MongoDB |
-| `GET` | `/api/v1/books` | Lista libros; admite `query`, `genre` y `featured` |
-| `POST` | `/api/v1/books` | Crea una obra en la colección `libros` |
-| `GET` | `/api/v1/books/:id` | Consulta una obra por identificador |
-| `GET` | `/api/v1/authors` | Lista autores |
+| Método | Ruta                | Uso                                                |
+| ------ | ------------------- | -------------------------------------------------- |
+| `GET`  | `/api/health`       | Comprueba la aplicación y la conexión a MongoDB    |
+| `GET`  | `/api/v1/books`     | Lista libros; admite `query`, `genre` y `featured` |
+| `POST` | `/api/v1/books`     | Crea una obra en la colección `libros`             |
+| `GET`  | `/api/v1/books/:id` | Consulta una obra por identificador                |
+| `GET`  | `/api/v1/authors`   | Lista autores                                      |
 
 ## Estructura
 
@@ -119,6 +120,7 @@ Babilon/
 ## Licencia
 
 Este proyecto se distribuye bajo la licencia MIT.
+
 # 📚 Babilon — Plataforma Integral de Libros y Lectura
 
 **Babilon** es una plataforma moderna para el descubrimiento, lectura y gestión de libros estructurada como un **Monorepo** con separación de responsabilidades:
@@ -133,6 +135,7 @@ Este proyecto se distribuye bajo la licencia MIT.
 ## 🚀 Inicio Rápido
 
 ### 1. Iniciar todo el entorno a la vez
+
 Ejecuta en la raíz del proyecto:
 
 ```bash
@@ -142,6 +145,7 @@ pnpm dev
 ```
 
 Esto iniciará concurrentemente:
+
 - **Express API** en `http://localhost:4000`
 - **Portal Web (Next.js)** en `http://localhost:3000`
 - **Panel Editorial (Angular)** en `http://localhost:4200`
@@ -150,13 +154,13 @@ Esto iniciará concurrentemente:
 
 ### 2. Iniciar servicios de manera individual
 
-| Módulo | Comando | Puerto | Descripción |
-| :--- | :--- | :--- | :--- |
-| **Backend API** | `npm run dev:api` | `http://localhost:4000` | Endpoints `/api/v1/books` y `/api/v1/authors` |
-| **Portal Web** | `npm run dev:web` | `http://localhost:3000` | Catálogo de lectores con Next.js |
-| **Panel Editorial** | `npm run dev:admin` | `http://localhost:4200` | Backoffice administrativo en Angular |
-| **Compilar Tipos** | `npm run build:types` | — | Compila `@babilon/shared-types` |
-| **Compilar Todo** | `npm run build` | — | Compila todos los proyectos para producción |
+| Módulo              | Comando               | Puerto                  | Descripción                                   |
+| :------------------ | :-------------------- | :---------------------- | :-------------------------------------------- |
+| **Backend API**     | `npm run dev:api`     | `http://localhost:4000` | Endpoints `/api/v1/books` y `/api/v1/authors` |
+| **Portal Web**      | `npm run dev:web`     | `http://localhost:3000` | Catálogo de lectores con Next.js              |
+| **Panel Editorial** | `npm run dev:admin`   | `http://localhost:4200` | Backoffice administrativo en Angular          |
+| **Compilar Tipos**  | `npm run build:types` | —                       | Compila `@babilon/shared-types`               |
+| **Compilar Todo**   | `npm run build`       | —                       | Compila todos los proyectos para producción   |
 
 ---
 
