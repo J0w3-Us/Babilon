@@ -2,7 +2,7 @@ import { Book, BookGenre, BookPage, BookChapter } from '@babilon/shared-types';
 
 const DEFAULT_COVER_URL = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=600&q=80';
 
-export function normalizeMongoBook(doc: Record<string, any>): Book {
+export function normalizeBook(doc: Record<string, any>): Book {
   const authorValue = doc.autor ?? doc.author;
   const author = typeof authorValue === 'string'
     ? {
@@ -29,7 +29,7 @@ export function normalizeMongoBook(doc: Record<string, any>): Book {
     doc.anio_publicacion ?? doc.publishedYear ?? doc.anioPublicacion ?? 2024
   );
 
-  // Normalizar páginas estructuradas de MongoDB
+  // Normalize the structured pages returned by the books API.
   const rawPaginas = Array.isArray(doc.paginas) ? doc.paginas : [];
   const pages: BookPage[] = rawPaginas.map((p: any, idx: number) => ({
     numero: Number(p.numero_pagina ?? p.numeroPagina ?? p.numero ?? idx + 1),

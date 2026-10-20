@@ -1,16 +1,14 @@
 # Babilon
 
-Babilon es una biblioteca digital para descubrir, preservar y leer obras literarias. La aplicación actual ofrece un portal web con catálogo, búsqueda, lectura paginada y carga de obras conectada directamente con MongoDB Atlas.
+Babilon es una biblioteca digital para descubrir, preservar y leer obras literarias. El portal web ofrece catálogo, búsqueda, lectura paginada y carga de obras conectados a la API publicada de libros.
 
 ## Estado actual
 
-El repositorio es un monorepo gestionado con pnpm y actualmente contiene:
+El repositorio es un monorepo gestionado con pnpm:
 
-- `apps/web`: aplicación Next.js 14 con App Router, Tailwind CSS, lector digital y Route Handlers.
+- `apps/web`: aplicación Next.js 14 con App Router, Tailwind CSS, lector digital y proxy seguro hacia la API de libros.
 - `packages/shared-types`: tipos TypeScript compartidos para libros, autores y respuestas de API.
 - `design-system/`: documentación visual y de producto.
-
-Las aplicaciones API independiente y panel administrativo descritas en algunos documentos de planificación todavía no forman parte del árbol ejecutable actual.
 
 ## Funcionalidades
 
@@ -21,13 +19,13 @@ Las aplicaciones API independiente y panel administrativo descritas en algunos d
 - Ajuste del tamaño de texto y modo pantalla completa.
 - Carga de libros y texto desde la interfaz.
 - Selector global de tema claro/oscuro con preferencia persistente.
-- Comprobación del estado de MongoDB Atlas.
+- Comprobación del estado de la API publicada y su base de datos.
 
 ## Requisitos
 
 - Node.js 20 o superior.
 - pnpm 9 o superior.
-- Una base de datos MongoDB accesible desde el entorno de ejecución.
+- Acceso a la API publicada de libros y su clave configurada.
 
 ## Configuración
 
@@ -40,11 +38,17 @@ pnpm install
 Crea `apps/web/.env.local` a partir de [`apps/web/.env.example`](apps/web/.env.example):
 
 ```env
-MONGODB_URI=mongodb+srv://usuario:password@cluster.mongodb.net/
-MONGODB_DB=biblioteca_digital
+LIBROS_API_URL=https://backend-libros-wj1t.onrender.com
+LIBROS_API_KEY=tu_api_key
+LIBROS_API_KEY_HEADER=x-api-key
+# Para Authorization Bearer:
+# LIBROS_API_KEY_HEADER=Authorization
+# LIBROS_API_KEY_PREFIX=Bearer%20
 ```
 
 No guardes credenciales reales en el repositorio. Si una credencial fue expuesta previamente, revócala y genera una nueva antes de desplegar.
+
+El frontend no conecta directamente con MongoDB. Las credenciales permanecen en el servidor y el Route Handler [`apps/web/src/app/api/backend/[...path]/route.ts`](apps/web/src/app/api/backend/[...path]/route.ts) añade la clave al solicitar la API externa.
 
 ## Desarrollo
 
@@ -69,19 +73,17 @@ pnpm build
 pnpm start
 ```
 
-La compilación genera primero los tipos compartidos y después la aplicación Next.js.
+## API de la aplicación
 
-## API local de la aplicación
+El frontend expone un proxy interno que mantiene la clave fuera del navegador:
 
-Los Route Handlers de Next.js están disponibles en:
+| Método | Ruta | Uso |
+| ------ | --- | --- |
+| `GET` | `/api/backend/api/salud` | Estado de la API publicada |
+| `GET` | `/api/backend/api/libros` | Catálogo; admite `query`, `genre` y `featured` |
+| `POST` | `/api/backend/api/libros` | Registro de una obra |
 
-| Método | Ruta                | Uso                                                |
-| ------ | ------------------- | -------------------------------------------------- |
-| `GET`  | `/api/health`       | Comprueba la aplicación y la conexión a MongoDB    |
-| `GET`  | `/api/v1/books`     | Lista libros; admite `query`, `genre` y `featured` |
-| `POST` | `/api/v1/books`     | Crea una obra en la colección `libros`             |
-| `GET`  | `/api/v1/books/:id` | Consulta una obra por identificador                |
-| `GET`  | `/api/v1/authors`   | Lista autores                                      |
+La API externa es la única responsable del acceso a datos. Las rutas locales directas de MongoDB ya no forman parte de `apps/web`.
 
 ## Estructura
 
@@ -90,10 +92,11 @@ Babilon/
 ├── apps/
 │   └── web/
 │       └── src/
-│           ├── app/                 # Páginas y Route Handlers
-│           ├── lib/                 # MongoDB y mapeadores
-│           └── services/            # Cliente de la API local
+│           ├── app/                 # Páginas y proxy de API
+│           ├── lib/                 # Mapeadores y utilidades
+│           └── services/            # Cliente de la API publicada
 ├── design-system/                   # Documentación de diseño
+├── docs/decisions/                  # Decisiones arquitectónicas
 ├── packages/
 │   └── shared-types/                # Contratos TypeScript
 ├── package.json
@@ -107,74 +110,15 @@ Babilon/
 - TypeScript.
 - Tailwind CSS y CSS custom properties.
 - Lucide React.
-- MongoDB Node.js Driver y MongoDB Atlas.
+- API REST publicada de libros.
 - pnpm workspaces.
 
 ## Documentación adicional
 
 - [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md): principios visuales y tokens.
 - [`BLUEPRINT.md`](BLUEPRINT.md): blueprint arquitectónico de referencia.
-- [`babilon_architecture_plan.md`](babilon_architecture_plan.md): planificación de evolución del monorepo.
-- [`api_v1_endpoints_catalog.md`](api_v1_endpoints_catalog.md): catálogo de endpoints previstos y disponibles.
+- [`docs/decisions/ADR-001-use-published-books-api.md`](docs/decisions/ADR-001-use-published-books-api.md): decisión de arquitectura sobre el acceso exclusivo mediante API.
 
 ## Licencia
 
 Este proyecto se distribuye bajo la licencia MIT.
-
-# 📚 Babilon — Plataforma Integral de Libros y Lectura
-
-**Babilon** es una plataforma moderna para el descubrimiento, lectura y gestión de libros estructurada como un **Monorepo** con separación de responsabilidades:
-
-- 🌐 **`apps/web` (Next.js)**: Portal público orientado al lector con diseño de biblioteca universal, catálogo interactivo, filtros y optimización SEO.
-- 🛡️ **`apps/admin` (Angular 20)**: Panel editorial empresarial para la administración de obras, control de inventario, formatos e ingresos.
-- ⚙️ **`apps/api` (Express.js + TypeScript)**: Backend RESTful central para libros, autores y reseñas.
-- 📦 **`packages/shared-types` (TypeScript)**: Contratos de datos unificados compartidos entre los frontends y el backend.
-
----
-
-## 🚀 Inicio Rápido
-
-### 1. Iniciar todo el entorno a la vez
-
-Ejecuta en la raíz del proyecto:
-
-```bash
-npm run dev
-# o con pnpm:
-pnpm dev
-```
-
-Esto iniciará concurrentemente:
-
-- **Express API** en `http://localhost:4000`
-- **Portal Web (Next.js)** en `http://localhost:3000`
-- **Panel Editorial (Angular)** en `http://localhost:4200`
-
----
-
-### 2. Iniciar servicios de manera individual
-
-| Módulo              | Comando               | Puerto                  | Descripción                                   |
-| :------------------ | :-------------------- | :---------------------- | :-------------------------------------------- |
-| **Backend API**     | `npm run dev:api`     | `http://localhost:4000` | Endpoints `/api/v1/books` y `/api/v1/authors` |
-| **Portal Web**      | `npm run dev:web`     | `http://localhost:3000` | Catálogo de lectores con Next.js              |
-| **Panel Editorial** | `npm run dev:admin`   | `http://localhost:4200` | Backoffice administrativo en Angular          |
-| **Compilar Tipos**  | `npm run build:types` | —                       | Compila `@babilon/shared-types`               |
-| **Compilar Todo**   | `npm run build`       | —                       | Compila todos los proyectos para producción   |
-
----
-
-## 🏛️ Estructura del Proyecto
-
-```
-Babilon/
-├── apps/
-│   ├── web/            # Next.js 14 App Router + Lucide Icons + SSR
-│   ├── admin/          # Angular 20 Standalone + Formularios Reactivos
-│   └── api/            # Express.js + TS + Rutas REST + Datos Semilla
-├── packages/
-│   └── shared-types/   # Modelos IBook, IAuthor, IReview, ApiResponse
-├── pnpm-workspace.yaml # Definición del monorepo
-├── package.json        # Orquestador con scripts concurrentes
-└── README.md
-```

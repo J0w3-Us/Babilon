@@ -33,7 +33,7 @@ export default function SubirPage() {
 
           <div className="hidden sm:flex items-center gap-2 text-xs text-stone-500 dark:text-stone-400 font-sans">
             <ShieldCheck size={14} className="text-emerald-600 dark:text-emerald-400" />
-            <span>Persistencia en MongoDB Atlas</span>
+            <span>Persistencia mediante la API de libros</span>
           </div>
         </div>
       </div>

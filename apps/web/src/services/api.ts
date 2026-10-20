@@ -1,4 +1,5 @@
-import { Book, ApiResponse, BookGenre, BookPage } from '@babilon/shared-types';
+import { Book, BookGenre, BookPage } from '@babilon/shared-types';
+import { normalizeBook } from '@/lib/bookMapper';
 
 export interface HealthInfo {
   online: boolean;
@@ -10,15 +11,11 @@ export interface HealthInfo {
 export interface FetchBooksResult {
   books: Book[];
   total: number;
-  storage: 'mongodb' | 'memory-fallback' | 'fallback';
+  storage: 'api' | 'memory-fallback' | 'fallback';
   online: boolean;
 }
 
-/**
- * Cliente local que conecta directamente con los Route Handlers de Next.js
- * y con la base de datos MongoDB biblioteca_digital.
- */
-async function localFetch<T>(endpoint: string, options?: RequestInit): Promise<{ data: T | null; response: Response | null }> {
+async function apiFetch<T>(endpoint: string, options?: RequestInit): Promise<{ data: T | null; response: Response | null }> {
   try {
     const res = await fetch(endpoint, {
       ...options,
@@ -29,9 +26,11 @@ async function localFetch<T>(endpoint: string, options?: RequestInit): Promise<{
     });
 
     if (res.ok) {
-      const data = await res.json();
+      const data = (await res.json()) as T;
       return { data, response: res };
     }
+
+    console.error(`La API devolvió ${res.status} para ${endpoint}`);
   } catch (err) {
     console.error(`Error en fetch a ${endpoint}:`, err);
   }
@@ -40,30 +39,34 @@ async function localFetch<T>(endpoint: string, options?: RequestInit): Promise<{
 }
 
 /**
- * Consulta el estado de la conexión directa a MongoDB Atlas (biblioteca_digital).
+ * Consulta el estado de la API publicada y su conexión con Atlas.
  */
 export async function checkApiHealth(): Promise<HealthInfo> {
-  const { data } = await localFetch<any>('/api/health');
+  const { data } = await apiFetch<{
+    status?: string;
+    message?: string;
+    database?: { connected?: boolean; status?: string };
+  }>('/api/backend/api/salud');
 
   if (!data) {
     return {
       online: false,
       dbConnected: false,
       dbStatus: 'sin conexión',
-      service: 'MongoDB Atlas Desconectado',
+      service: 'API de libros desconectada',
     };
   }
 
   return {
     online: true,
-    dbConnected: data.database?.connected ?? false,
+    dbConnected: data.database?.connected ?? data.status === 'ok',
     dbStatus: data.database?.status ?? 'conectado',
-    service: data.service ?? 'MongoDB Atlas (biblioteca_digital)',
+    service: data.message ?? 'API Biblioteca Eclesiástica',
   };
 }
 
 /**
- * Obtiene el catálogo de libros con filtros directamente desde MongoDB Atlas.
+ * Obtiene el catálogo de libros desde la API publicada.
  */
 export async function getBooksApi(params?: {
   query?: string;
@@ -81,19 +84,18 @@ export async function getBooksApi(params?: {
     queryParams.append('featured', 'true');
   }
 
-  const endpoint = `/api/v1/books${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-  const { data, response } = await localFetch<ApiResponse<Book[]>>(endpoint);
+  const endpoint = `/api/backend/api/libros${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+  const { data } = await apiFetch<unknown>(endpoint);
+  const rawBooks = extractBooks(data);
 
-  if (data && data.success && Array.isArray(data.data)) {
-    const storageHeader =
-      response?.headers.get('x-babilon-storage') ||
-      response?.headers.get('X-Babilon-Storage');
-    const storage: 'mongodb' | 'memory-fallback' =
-      storageHeader === 'mongodb' ? 'mongodb' : 'memory-fallback';
+  if (rawBooks) {
+    const books = rawBooks
+      .map((book) => normalizeBook(book))
+      .filter((book) => matchesBookFilters(book, params));
     return {
-      books: data.data,
-      total: data.meta?.total ?? data.data.length,
-      storage,
+      books,
+      total: books.length,
+      storage: 'api',
       online: true,
     };
   }
@@ -107,7 +109,7 @@ export async function getBooksApi(params?: {
 }
 
 /**
- * Registra o sube un nuevo libro directamente en la colección 'libros' de MongoDB biblioteca_digital.
+ * Registra o actualiza un libro en la API publicada.
  * Soporta metadatos completos, texto continuo (fullText), o array de páginas estructuradas.
  */
 export async function createBookApi(book: {
@@ -123,21 +125,96 @@ export async function createBookApi(book: {
   fullText?: string;
   paginas?: BookPage[];
 }): Promise<{ success: boolean; book?: Book; message?: string }> {
-  const { data } = await localFetch<ApiResponse<Book>>('/api/v1/books', {
+  const { data } = await apiFetch<unknown>('/api/backend/api/libros', {
     method: 'POST',
-    body: JSON.stringify(book),
+    body: JSON.stringify({
+      ...book,
+      titulo: book.title,
+      autor: book.author.name,
+      editorial: book.publisher,
+      anio_publicacion: book.publishedYear,
+      categorias: book.genres,
+      sinopsis: book.synopsis,
+      portada_url: book.coverUrl,
+      paginas: book.paginas,
+    }),
   });
 
-  if (data && data.success && data.data) {
+  const createdBook = extractSingleBook(data);
+  if (createdBook) {
     return {
       success: true,
-      book: data.data,
-      message: data.message || 'Libro guardado exitosamente en MongoDB biblioteca_digital',
+      book: normalizeBook(createdBook),
+      message: getApiMessage(data) || 'Libro guardado exitosamente en la API de libros',
     };
   }
 
   return {
     success: false,
-    message: data?.message || 'No se pudo registrar el libro en la base de datos',
+    message: getApiMessage(data) || 'No se pudo registrar el libro en la API',
   };
+}
+
+function extractBooks(payload: unknown): Record<string, unknown>[] | null {
+  if (Array.isArray(payload)) {
+    return payload.filter(isRecord);
+  }
+
+  if (!isRecord(payload)) {
+    return null;
+  }
+
+  const candidates = [payload.data, payload.books, payload.libros];
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) {
+      return candidate.filter(isRecord);
+    }
+    if (isRecord(candidate)) {
+      const nested = candidate.books ?? candidate.libros;
+      if (Array.isArray(nested)) {
+        return nested.filter(isRecord);
+      }
+    }
+  }
+
+  return null;
+}
+
+function extractSingleBook(payload: unknown): Record<string, unknown> | null {
+  if (isRecord(payload)) {
+    if (isRecord(payload.data)) return payload.data;
+    if (isRecord(payload.book)) return payload.book;
+    if ('titulo' in payload || 'title' in payload) return payload;
+  }
+  return null;
+}
+
+function getApiMessage(payload: unknown): string | undefined {
+  return isRecord(payload) && typeof payload.message === 'string'
+    ? payload.message
+    : undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function matchesBookFilters(
+  book: Book,
+  params?: { query?: string; genre?: string; featured?: boolean }
+): boolean {
+  const query = params?.query?.trim().toLocaleLowerCase();
+  const matchesQuery =
+    !query ||
+    [book.title, book.isbn, book.author.name, book.synopsis]
+      .join(' ')
+      .toLocaleLowerCase()
+      .includes(query);
+  const matchesGenre =
+    !params?.genre ||
+    params.genre === 'Todos' ||
+    book.genres.some((genre) => genre.toLocaleLowerCase() === params.genre?.toLocaleLowerCase());
+  const matchesFeatured = !params?.featured || Boolean(book.featured);
+
+  return matchesQuery && matchesGenre && matchesFeatured;
 }

@@ -103,14 +103,14 @@ export function HeroSection() {
                   Almacenamiento
                 </p>
                 <p className="font-serif text-2xl font-bold text-emerald-700 dark:text-emerald-400 mt-1">
-                  MongoDB
+                  API de libros
                 </p>
-                <p className="text-[11px] text-stone-400 dark:text-stone-500 mt-0.5">Atlas biblioteca_digital</p>
+                <p className="text-[11px] text-stone-400 dark:text-stone-500 mt-0.5">Catálogo centralizado</p>
               </div>
             </div>
           </div>
 
-          {/* Right Column: Interactive Showcase Card Conectado a MongoDB */}
+          {/* Right Column: Interactive Showcase Card connected to the books API */}
           <div className="lg:col-span-5">
             <div className="rounded-2xl bg-white dark:bg-surface-100 border border-stone-200 dark:border-surface-300 p-7 shadow-card dark:shadow-dark-card space-y-5">
               <div className="flex items-center justify-between pb-3.5 border-b border-stone-100 dark:border-surface-300">

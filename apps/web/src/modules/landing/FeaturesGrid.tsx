@@ -51,10 +51,10 @@ export function FeaturesGrid() {
               <Layers size={20} className="text-stone-300 dark:text-stone-200" />
             </div>
             <h3 className="font-serif text-xl font-bold text-stone-900 dark:text-stone-100">
-              Conexión Nativa MongoDB
+              API de libros centralizada
             </h3>
             <p className="text-xs sm:text-sm text-stone-600 dark:text-stone-400 leading-relaxed">
-              Consultas directas a la base de datos <code className="font-mono text-terracotta-700 dark:text-terracotta-400">biblioteca_digital</code> sin intermediarios que ralenticen el flujo.
+              Consulta y registra obras mediante un único servicio protegido, con contratos consistentes para todo el portal.
             </p>
           </div>
         </div>

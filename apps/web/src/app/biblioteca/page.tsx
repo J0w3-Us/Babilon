@@ -55,7 +55,7 @@ function BibliotecaContent() {
     }
   }, [searchParams]);
 
-  // Cargar catálogo de libros desde MongoDB
+  // Cargar catálogo de libros desde la API publicada
   const fetchBooks = useCallback(async () => {
     setLoading(true);
     try {
@@ -65,7 +65,7 @@ function BibliotecaContent() {
       });
       setBooks(result.books);
     } catch {
-      showToast('Error al conectar con la base de datos de Babilon');
+      showToast('Error al conectar con la API de libros de Babilon');
     } finally {
       setLoading(false);
     }
@@ -118,7 +118,7 @@ function BibliotecaContent() {
             {health && (
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 text-xs font-medium border border-emerald-200 dark:border-emerald-800">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                MongoDB Atlas: {books.length} obras
+                API de libros: {books.length} obras
               </span>
             )}
 
@@ -206,7 +206,7 @@ function BibliotecaContent() {
               className="animate-spin mx-auto text-stone-600 dark:text-stone-400 mb-3"
             />
             <p className="text-sm font-medium text-stone-600 dark:text-stone-400">
-              Consultando catálogo en MongoDB Atlas...
+              Consultando catálogo en la API de libros...
             </p>
           </div>
         ) : books.length === 0 ? (
@@ -267,7 +267,7 @@ function BibliotecaContent() {
                     Subir y Digitalizar Obra
                   </h3>
                   <p className="text-xs text-stone-500 dark:text-stone-400 font-sans">
-                    Persistencia directa en MongoDB Atlas
+                    Persistencia en la API de libros
                   </p>
                 </div>
               </div>

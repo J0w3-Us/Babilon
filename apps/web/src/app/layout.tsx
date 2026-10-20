@@ -82,7 +82,7 @@ export default function RootLayout({
                 Babilon
               </div>
               <p className="text-xs leading-relaxed text-stone-500 dark:text-stone-400 font-sans">
-                Iniciativa de preservación y lectura inmersiva con almacenamiento directo en MongoDB Atlas.
+                Iniciativa de preservación y lectura inmersiva conectada a la API de libros.
               </p>
             </div>
 
@@ -99,7 +99,7 @@ export default function RootLayout({
               <h4 className="text-xs uppercase tracking-wider font-semibold text-stone-800 dark:text-stone-200 mb-3">Plataforma</h4>
               <ul className="space-y-2 text-xs">
                 <li className="text-stone-600 dark:text-stone-300 font-medium">Next.js 14 App Router</li>
-                <li className="text-stone-600 dark:text-stone-300 font-medium">MongoDB Atlas Nativo</li>
+                <li className="text-stone-600 dark:text-stone-300 font-medium">API de libros protegida</li>
                 <li className="text-stone-600 dark:text-stone-300 font-medium">Lector Editorial de Alta Legibilidad</li>
               </ul>
             </div>

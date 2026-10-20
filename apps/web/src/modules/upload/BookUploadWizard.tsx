@@ -119,7 +119,7 @@ export function BookUploadWizard({
     } catch {
       setStatusMessage({
         type: 'error',
-        text: 'Error al conectar con la base de datos de Babilon.',
+        text: 'Error al conectar con la API de libros de Babilon.',
       });
     } finally {
       setIsSubmitting(false);
