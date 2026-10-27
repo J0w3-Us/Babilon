@@ -147,8 +147,30 @@ export interface BookExtractionResult {
   suggestedBookDraft?: Partial<Book>;
 }
 
-export interface OcrScanOptions {
-  languages?: string;
-  mode?: BookScanMode;
-  autoDraftBook?: boolean;
+export interface MinerUPageOutput {
+  pageNumber: number;
+  markdown: string;
+  images?: string[];
+  tables?: string[];
 }
+
+export interface MinerUScanResult {
+  engine: 'mineru';
+  success: boolean;
+  rawMarkdown: string;
+  pages?: MinerUPageOutput[];
+  metadata?: ExtractedBookMetadata;
+  suggestedTitle?: string;
+  suggestedAuthor?: string;
+  suggestedSynopsis?: string;
+  suggestedIsbn?: string;
+  processingTimeMs?: number;
+  warnings?: string[];
+}
+
+export interface MinerUScanOptions {
+  enableOcr?: boolean;
+  extractImages?: boolean;
+  language?: string;
+}
+
