@@ -31,12 +31,30 @@ export function normalizeBook(doc: Record<string, any>): Book {
 
   // Normalize the structured pages returned by the books API.
   const rawPaginas = Array.isArray(doc.paginas) ? doc.paginas : [];
-  const pages: BookPage[] = rawPaginas.map((p: any, idx: number) => ({
-    numero: Number(p.numero_pagina ?? p.numeroPagina ?? p.numero ?? idx + 1),
-    texto: String(p.texto ?? p.textoExtraido ?? p.content ?? ''),
-    nombre_archivo: p.nombre_archivo,
-    conteo_palabras: p.conteo_palabras ?? (p.texto ? p.texto.split(/\s+/).length : undefined),
-  }));
+  const pages: BookPage[] = rawPaginas.map((p: any, idx: number) => {
+    // Cubrir todas las variantes de nombre de campo que puede devolver MongoDB / la API
+    const textoRaw =
+      p.texto ??
+      p.texto_extraido ??
+      p.textoExtraido ??
+      p.page_text ??
+      p.pageText ??
+      p.content ??
+      p.body ??
+      p.text ??
+      '';
+    const textoStr = String(textoRaw);
+    const wordCount =
+      p.conteo_palabras ??
+      p.palabra_count ??
+      (textoStr.trim() ? textoStr.trim().split(/\s+/).length : 0);
+    return {
+      numero: Number(p.numero_pagina ?? p.numeroPagina ?? p.numero ?? p.page ?? idx + 1),
+      texto: textoStr,
+      nombre_archivo: p.nombre_archivo ?? p.filename ?? p.file_name,
+      conteo_palabras: wordCount,
+    };
+  });
 
   // Normalizar capítulos
   const rawCapitulos = Array.isArray(doc.capitulos) ? doc.capitulos : [];

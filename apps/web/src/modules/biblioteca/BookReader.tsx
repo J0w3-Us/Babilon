@@ -25,6 +25,8 @@ interface BookReaderProps {
   onFontSizeChange: (updater: (prev: number) => number) => void;
   isFullscreen: boolean;
   onToggleFullscreen: () => void;
+  /** true mientras se hace fetch del detalle completo con páginas */
+  isLoadingPages?: boolean;
 }
 
 export function BookReader({
@@ -38,39 +40,65 @@ export function BookReader({
   onFontSizeChange,
   isFullscreen,
   onToggleFullscreen,
+  isLoadingPages = false,
 }: BookReaderProps) {
-  // Páginas preparadas para el Lector
+  // Páginas preparadas para el Lector.
+  // Prioridad: 1) book.pages con texto real → 2) sampleChapterText parseado → 3) synopsis / fallback
   const readerPages: BookPage[] = useMemo(() => {
     if (!book) return [];
 
+    // 1. Array de páginas estructuradas con contenido real
     if (book.pages && book.pages.length > 0) {
-      return book.pages;
-    }
-
-    if (book.sampleChapterText) {
-      const blocks = book.sampleChapterText
-        .split(/---\s*Página\s*\d+\s*---/)
-        .filter(Boolean);
-      if (blocks.length > 1) {
-        return blocks.map((b, idx) => ({
-          numero: idx + 1,
-          texto: b.trim(),
-        }));
+      const pagesWithContent = book.pages.filter((p) => p.texto && p.texto.trim().length > 0);
+      if (pagesWithContent.length > 0) {
+        return pagesWithContent;
       }
-      return [
-        {
-          numero: 1,
-          texto: book.sampleChapterText,
-        },
-      ];
     }
 
+    // 2. Texto de muestra: parsear separadores "--- Página N ---"
+    if (book.sampleChapterText && book.sampleChapterText.trim().length > 0) {
+      // Regex con captura del número real de página
+      const separatorRegex = /---\s*Página\s*(\d+)\s*---/g;
+      const matches = [...book.sampleChapterText.matchAll(separatorRegex)];
+
+      if (matches.length > 0) {
+        const parsedPages: BookPage[] = [];
+        matches.forEach((match, i) => {
+          const pageNum = parseInt(match[1], 10);
+          const startIdx = (match.index ?? 0) + match[0].length;
+          const endIdx = matches[i + 1]?.index ?? book.sampleChapterText!.length;
+          const texto = book.sampleChapterText!.slice(startIdx, endIdx).trim();
+          if (texto.length > 0) {
+            parsedPages.push({ numero: pageNum, texto });
+          }
+        });
+        if (parsedPages.length > 0) return parsedPages;
+      }
+
+      // Sin separadores: dividir por longitud fija (~1800 caracteres por página)
+      const fullText = book.sampleChapterText.trim();
+      if (fullText.length > 1800) {
+        const chunkSize = 1800;
+        const chunks: BookPage[] = [];
+        for (let i = 0; i < fullText.length; i += chunkSize) {
+          chunks.push({
+            numero: Math.floor(i / chunkSize) + 1,
+            texto: fullText.slice(i, i + chunkSize).trim(),
+          });
+        }
+        return chunks;
+      }
+
+      return [{ numero: 1, texto: book.sampleChapterText.trim() }];
+    }
+
+    // 3. Fallback: mostrar sinopsis o mensaje de digitalización pendiente
     return [
       {
         numero: 1,
-        texto:
-          book.synopsis ||
-          'Texto en proceso de digitalización para esta obra de archivo.',
+        texto: book.synopsis?.trim()
+          ? `${book.synopsis}\n\n— Esta obra aún no tiene su texto completo digitalizado en el catálogo de Babilon.`
+          : 'Texto en proceso de digitalización para esta obra de archivo.',
       },
     ];
   }, [book]);
@@ -220,13 +248,28 @@ export function BookReader({
               )}
             </div>
 
-            {/* Page Content Body con Drop-cap elegante */}
-            <div
-              style={{ fontSize: `${fontSize}px` }}
-              className="font-serif leading-relaxed sm:leading-loose whitespace-pre-line text-justify first-letter:float-left first-letter:text-5xl first-letter:pr-3 first-letter:font-serif first-letter:text-terracotta-600 dark:first-letter:text-terracotta-500"
-            >
-              {currentPageData.texto}
-            </div>
+            {/* Page Content Body */}
+            {isLoadingPages ? (
+              <div className="flex flex-col items-center justify-center py-20 gap-3 opacity-60">
+                <svg
+                  className="animate-spin w-6 h-6 text-terracotta-600 dark:text-terracotta-500"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                </svg>
+                <span className="text-xs font-mono uppercase tracking-widest">Cargando páginas...</span>
+              </div>
+            ) : (
+              <div
+                style={{ fontSize: `${fontSize}px` }}
+                className="font-serif leading-relaxed sm:leading-loose whitespace-pre-line text-justify first-letter:float-left first-letter:text-5xl first-letter:pr-3 first-letter:font-serif first-letter:text-terracotta-600 dark:first-letter:text-terracotta-500"
+              >
+                {currentPageData.texto}
+              </div>
+            )}
           </div>
         </div>
 

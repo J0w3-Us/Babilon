@@ -1,16 +1,43 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const backendUrl = (process.env.LIBROS_API_URL || process.env.API_BASE_URL || 'https://backend-libros-wj1t.onrender.com').replace(/\/+$/, '');
+const appUsername = process.env.APP_USERNAME || process.env.APP_USER;
+const appPassword = process.env.APP_PASSWORD || process.env.APP_PASS;
 const apiKey = process.env.LIBROS_API_KEY || process.env.API_KEY;
-const apiKeyHeader = process.env.LIBROS_API_KEY_HEADER || process.env.API_KEY_HEADER || 'x-api-key';
+const apiKeyHeader = process.env.LIBROS_API_KEY_HEADER || process.env.API_KEY_HEADER;
 const apiKeyPrefix = process.env.LIBROS_API_KEY_PREFIX || process.env.API_KEY_PREFIX || '';
+
+function getAuthHeader(): { header: string; value: string } | null {
+  // 1. Si se configuró usuario y contraseña, se genera Basic Auth (base64)
+  if (appUsername && appPassword !== undefined) {
+    const credentials = Buffer.from(`${appUsername}:${appPassword}`).toString('base64');
+    return {
+      header: 'Authorization',
+      value: `Basic ${credentials}`,
+    };
+  }
+
+  // 2. Si se configuró API Key directa
+  if (apiKey) {
+    const headerName = apiKeyHeader || 'x-api-key';
+    const prefix = apiKeyPrefix ? (apiKeyPrefix.endsWith(' ') ? apiKeyPrefix : `${apiKeyPrefix} `) : '';
+    return {
+      header: headerName,
+      value: `${prefix}${apiKey}`,
+    };
+  }
+
+  return null;
+}
 
 async function proxy(request: NextRequest, { params }: { params: { path: string[] } }) {
   const path = params.path.join('/');
   const isPublicHealthCheck = path === 'api/salud' || path === 'healthz';
-  if (!apiKey && !isPublicHealthCheck) {
+  const authHeader = getAuthHeader();
+
+  if (!authHeader && !isPublicHealthCheck) {
     return NextResponse.json(
-      { success: false, message: 'LIBROS_API_KEY no está configurada en el servidor' },
+      { success: false, message: 'Credenciales de acceso (APP_USERNAME/APP_PASSWORD o LIBROS_API_KEY) no configuradas en el servidor' },
       { status: 500 }
     );
   }
@@ -20,8 +47,9 @@ async function proxy(request: NextRequest, { params }: { params: { path: string[
   headers.delete('host');
   headers.delete('content-length');
   headers.delete('accept-encoding');
-  if (apiKey) {
-    headers.set(apiKeyHeader, `${apiKeyPrefix}${apiKey}`);
+
+  if (authHeader) {
+    headers.set(authHeader.header, authHeader.value);
   }
 
   try {

@@ -1,4 +1,4 @@
-import { Book, BookGenre, BookPage } from '@babilon/shared-types';
+import { Book, BookGenre, BookPage, MinerUScanResult } from '@babilon/shared-types';
 import { normalizeBook } from '@/lib/bookMapper';
 
 export interface HealthInfo {
@@ -109,6 +109,19 @@ export async function getBooksApi(params?: {
 }
 
 /**
+ * Obtiene el detalle completo de un libro por su ID (incluyendo el array de páginas).
+ * El endpoint de catálogo no devuelve `paginas` por tamaño; este sí lo hace.
+ */
+export async function getBookByIdApi(bookId: string): Promise<Book | null> {
+  const { data } = await apiFetch<unknown>(`/api/backend/api/libros/${encodeURIComponent(bookId)}`);
+  const raw = extractSingleBook(data);
+  if (raw) {
+    return normalizeBook(raw);
+  }
+  return null;
+}
+
+/**
  * Registra o actualiza un libro en la API publicada.
  * Soporta metadatos completos, texto continuo (fullText), o array de páginas estructuradas.
  */
@@ -154,6 +167,22 @@ export async function createBookApi(book: {
     message: getApiMessage(data) || 'No se pudo registrar el libro en la API',
   };
 }
+
+import { mineruScannerService } from './mineru.service';
+
+/**
+ * Escanea un libro en formato PDF utilizando MinerU para extraer metadatos y cuerpo en Markdown.
+ * Delegado al servicio especializado mineruScannerService.
+ */
+export async function scanBookPdfWithMinerU(file: File): Promise<{
+  success: boolean;
+  data?: MinerUScanResult;
+  message?: string;
+}> {
+  return mineruScannerService.scan(file);
+}
+
+
 
 function extractBooks(payload: unknown): Record<string, unknown>[] | null {
   if (Array.isArray(payload)) {
