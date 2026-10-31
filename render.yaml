@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: babilon-web
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm build
+    startCommand: pnpm start
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 20.18.0
+      - key: LIBROS_API_URL
+        value: https://backend-libros-wj1t.onrender.com
+      - key: LIBROS_API_KEY
+        sync: false
+      - key: LIBROS_API_KEY_HEADER
+        value: x-api-key
+      - key: APP_USERNAME
+        sync: false
+      - key: APP_PASSWORD
+        sync: false
+      - key: MINERU_API_URL
+        value: http://localhost:8000
+      - key: MINERU_API_KEY
+        sync: false
+
