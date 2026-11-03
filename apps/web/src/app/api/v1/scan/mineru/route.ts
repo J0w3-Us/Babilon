@@ -1,64 +1,46 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { processMinerUOutput } from '@/lib/mineruParser';
+import { extractText, getDocumentProxy } from 'unpdf';
 import { spawn } from 'child_process';
 import { promises as fs } from 'fs';
 import path from 'path';
 import os from 'os';
 
-// Polyfills para compatibilidad de pdfjs-dist en entornos serverless puros de Node.js (Vercel)
-if (typeof (globalThis as any).DOMMatrix === 'undefined') {
-  (globalThis as any).DOMMatrix = class DOMMatrix {};
-}
-if (typeof (globalThis as any).ImageData === 'undefined') {
-  (globalThis as any).ImageData = class ImageData {};
-}
-if (typeof (globalThis as any).Path2D === 'undefined') {
-  (globalThis as any).Path2D = class Path2D {};
-}
-
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-async function extractWithPdfParse(buffer: Buffer) {
-  // Import dinámico para asegurar que los polyfills ya existan en globalThis
-  const { PDFParse } = await import('pdf-parse');
-  const parser = new PDFParse({ data: buffer });
-  try {
-    const textResult = await parser.getText();
-    const infoResult = await parser.getInfo();
+async function extractWithUnpdf(uint8Array: Uint8Array) {
+  const doc = await getDocumentProxy(uint8Array);
+  const metadata = await doc.getMetadata();
+  const info = metadata?.info as Record<string, unknown> | undefined;
 
-    let fullMarkdown = '';
-    if (textResult.pages && textResult.pages.length > 0) {
-      fullMarkdown = textResult.pages
-        .map((p) => {
-          const lines = p.text
-            .split('\n')
-            .map((l) => l.trim())
-            .filter(Boolean);
-          return `## Página ${p.num}\n\n${lines.join('\n\n')}`;
-        })
-        .join('\n\n---\n\n');
-    } else {
-      fullMarkdown = textResult.text || '';
-    }
+  const { totalPages, text } = await extractText(doc, { mergePages: false });
 
-    const title = (infoResult.info?.Title as string) || '';
-    const author = (infoResult.info?.Author as string) || '';
-
-    return {
-      markdown: fullMarkdown,
-      title,
-      author,
-      pageCount: textResult.total || textResult.pages?.length || 1,
-      engine: 'pdf-parse-js',
-    };
-  } finally {
-    try {
-      await parser.destroy();
-    } catch {
-      // Ignorar error al destruir parser
-    }
+  let fullMarkdown = '';
+  if (Array.isArray(text) && text.length > 0) {
+    fullMarkdown = text
+      .map((pageText, idx) => {
+        const lines = pageText
+          .split('\n')
+          .map((l) => l.trim())
+          .filter(Boolean);
+        return `## Página ${idx + 1}\n\n${lines.join('\n\n')}`;
+      })
+      .join('\n\n---\n\n');
+  } else {
+    fullMarkdown = Array.isArray(text) ? text.join('\n\n') : String(text || '');
   }
+
+  const title = (info?.Title as string) || '';
+  const author = (info?.Author as string) || '';
+
+  return {
+    markdown: fullMarkdown,
+    title,
+    author,
+    pageCount: totalPages || (Array.isArray(text) ? text.length : 1),
+    engine: 'unpdf-serverless',
+  };
 }
 
 async function tryExtractWithPython(scriptPath: string, filePath: string): Promise<{
@@ -82,9 +64,9 @@ async function tryExtractWithPython(scriptPath: string, filePath: string): Promi
         stderr += chunk.toString();
       });
 
-      // Manejador crítico: evita que Node lance 'Uncaught Exception' si python no existe (como en Vercel)
+      // Evita que Node lance 'Uncaught Exception' si python no está en el servidor
       pyProcess.on('error', (err) => {
-        console.warn('Python no disponible en este entorno de ejecución:', err.message);
+        console.warn('Python no disponible en este entorno:', err.message);
         resolve(null);
       });
 
@@ -132,7 +114,7 @@ export async function POST(request: NextRequest) {
     const mineruServiceUrl = process.env.MINERU_API_URL?.replace(/\/+$/, '');
     const mineruApiKey = process.env.MINERU_API_KEY;
 
-    // 1. Si existe un servicio MinerU remoto / microservicio configurado (no localhost en la nube)
+    // 1. Si existe un servicio MinerU remoto configurado (no localhost en la nube)
     const isLocalhost = mineruServiceUrl?.includes('localhost') || mineruServiceUrl?.includes('127.0.0.1');
     const isCloud = !!process.env.VERCEL || process.env.NODE_ENV === 'production';
 
@@ -181,9 +163,9 @@ export async function POST(request: NextRequest) {
     }
 
     const arrayBuffer = await file.arrayBuffer();
-    const fileBuffer = Buffer.from(arrayBuffer);
+    const uint8Array = new Uint8Array(arrayBuffer);
 
-    // 2. Intentar extracción con Python solo si está disponible en el entorno
+    // 2. Intentar extracción con Python solo si está disponible en la máquina
     const scriptPath = path.join(process.cwd(), 'src', 'lib', 'pdf_extractor.py');
     const tempDir = os.tmpdir();
     const tempFilePath = path.join(tempDir, `babilon_pdf_${Date.now()}_${filename.replace(/[^a-zA-Z0-9.-]/g, '_')}`);
@@ -197,15 +179,15 @@ export async function POST(request: NextRequest) {
     } | null = null;
 
     try {
-      await fs.writeFile(tempFilePath, fileBuffer);
+      await fs.writeFile(tempFilePath, Buffer.from(arrayBuffer));
       pythonResult = await tryExtractWithPython(scriptPath, tempFilePath);
     } catch {
-      // Ignorar fallo al preparar archivo temporal
+      // Ignorar fallo al preparar temporal
     } finally {
       try {
         await fs.unlink(tempFilePath);
       } catch {
-        // Ignorar fallo al eliminar temporal
+        // Ignorar fallo al limpiar temporal
       }
     }
 
@@ -228,16 +210,16 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 3. Motor nativo de extracción en Node.js (100% compatible con Vercel Serverless, sin Python)
+    // 3. Motor nativo de extracción serverless (unpdf, sin dependencias de Python ni canvas)
     try {
-      const jsResult = await extractWithPdfParse(fileBuffer);
+      const unpdfResult = await extractWithUnpdf(uint8Array);
       const parsed = processMinerUOutput({
-        markdown: jsResult.markdown,
+        markdown: unpdfResult.markdown,
         filename,
         metadata: {
-          title: jsResult.title,
-          author: jsResult.author,
-          pageCount: jsResult.pageCount,
+          title: unpdfResult.title,
+          author: unpdfResult.author,
+          pageCount: unpdfResult.pageCount,
         },
         processingTimeMs: Date.now() - startTime,
       });
@@ -245,7 +227,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         data: parsed,
-        engine: 'babilon-native-engine',
+        engine: 'unpdf-serverless',
       });
     } catch (parseErr) {
       console.error('Error en extracción nativa:', parseErr);
