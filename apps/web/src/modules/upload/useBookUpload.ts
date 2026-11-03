@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { BookGenre, MinerUScanResult } from '@babilon/shared-types';
 import { createBookApi } from '@/services/api';
 import { mineruScannerService } from '@/services/mineru.service';
+import { splitTextIntoPages, formatPagesToDocument } from '@/lib/pageSplitter';
 
 export interface UseBookUploadOptions {
   onSuccess?: () => void;
@@ -83,9 +84,14 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
     reader.onload = (event) => {
       const text = event.target?.result as string;
       if (text) {
-        setFullText(text);
-        if (!synopsis) {
-          setSynopsis(text.slice(0, 220).trim() + '...');
+        // Dividir y estructurar en páginas reales
+        const parsedPages = splitTextIntoPages(text);
+        const formattedDoc = formatPagesToDocument(parsedPages);
+        setFullText(formattedDoc);
+
+        if (!synopsis && parsedPages.length > 0) {
+          const firstPageClean = parsedPages[0].texto.slice(0, 260).trim();
+          setSynopsis(firstPageClean + (firstPageClean.length >= 260 ? '...' : ''));
         }
       }
     };
@@ -112,19 +118,23 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
     setStatusMessage(null);
 
     try {
-      // Convertir el Markdown o texto dividido por páginas en la estructura 'paginas' de MongoDB
+      // Convertir el texto en páginas estructuradas limpias para MongoDB
       let paginas = undefined;
+      let sampleChapterText: string | undefined = undefined;
+
       if (fullText.trim()) {
-        const rawPages = fullText.split(/\n\s*---\s*\n/);
-        paginas = rawPages.map((pageContent, idx) => ({
-          numero: idx + 1,
-          texto: pageContent.trim(),
-          conteo_palabras: pageContent.trim().split(/\s+/).filter(Boolean).length,
+        const parsedPages = splitTextIntoPages(fullText);
+        paginas = parsedPages.map((p) => ({
+          numero: p.numero,
+          texto: p.texto,
+          conteo_palabras: p.conteo_palabras,
         }));
+
+        // Preparar muestra para vista rápida
+        sampleChapterText = formatPagesToDocument(parsedPages.slice(0, 3));
       }
 
       const isbnVal = isbn.trim() || `ISBN-BAB-${Date.now().toString().slice(-6)}`;
-
 
       const res = await createBookApi({
         title: title.trim(),
@@ -135,6 +145,7 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
         publisher: publisher.trim() || 'Editorial Babilon',
         synopsis: synopsis.trim() || 'Sin sinopsis registrada.',
         coverUrl: coverUrl.trim() || undefined,
+        sampleChapterText,
         fullText: fullText.trim() || undefined,
         paginas,
       });
@@ -163,9 +174,11 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
     }
   };
 
-  const previewEstimatedPages = fullText
-    ? Math.max(1, Math.ceil(fullText.length / 1800))
-    : 0;
+  const previewEstimatedPages = useMemo(() => {
+    if (!fullText.trim()) return 0;
+    const pages = splitTextIntoPages(fullText);
+    return pages.length;
+  }, [fullText]);
 
   return {
     state: {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { processMinerUOutput } from '@/lib/mineruParser';
+import { formatPagesToDocument } from '@/lib/pageSplitter';
 import { extractText, getDocumentProxy } from 'unpdf';
 import { spawn } from 'child_process';
 import { promises as fs } from 'fs';
@@ -73,21 +74,19 @@ async function extractWithUnpdf(uint8Array: Uint8Array) {
     }
   }
 
-  // Construir Markdown final: cada página como sección separada por ---
-  // Esto permite que `submitBook` en el frontend lo divida correctamente
-  // haciendo split por /\n\s*---\s*\n/
-  const fullMarkdown = pages
-    .map(({ pageNum, content }) => {
-      // Formatear líneas de la página preservando su estructura
-      const lines = content
-        .split('\n')
-        .map((l) => l.trim())
-        .filter(Boolean);
+  // Construir documento final estructurado por páginas claras y legibles
+  const structuredPages = pages.map(({ pageNum, content }) => {
+    const lines = content
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean);
+    return {
+      numero: pageNum,
+      texto: lines.join('\n\n'),
+    };
+  });
 
-      const body = lines.join('\n\n');
-      return `## Página ${pageNum}\n\n${body}`;
-    })
-    .join('\n\n---\n\n');
+  const fullMarkdown = formatPagesToDocument(structuredPages);
 
   const title = (info?.Title as string)?.trim() || '';
   const author = (info?.Author as string)?.trim() || '';
@@ -200,12 +199,14 @@ export async function POST(request: NextRequest) {
             remoteData.markdown ||
             remoteData.text ||
             (Array.isArray(remoteData.pages)
-              ? remoteData.pages
-                  .map(
-                    (p: { markdown?: string; pageNumber?: number }, idx: number) =>
-                      `## Página ${p.pageNumber || idx + 1}\n\n${p.markdown || ''}`
+              ? formatPagesToDocument(
+                  remoteData.pages.map(
+                    (p: { markdown?: string; text?: string; pageNumber?: number }, idx: number) => ({
+                      numero: p.pageNumber || idx + 1,
+                      texto: p.markdown || p.text || '',
+                    })
                   )
-                  .join('\n\n---\n\n')
+                )
               : '');
 
           const parsed = processMinerUOutput({

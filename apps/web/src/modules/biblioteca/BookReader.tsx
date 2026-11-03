@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { Book, BookPage } from '@babilon/shared-types';
+import { splitTextIntoPages } from '@/lib/pageSplitter';
 import {
   BookOpen,
   X,
@@ -51,45 +52,28 @@ export function BookReader({
     if (book.pages && book.pages.length > 0) {
       const pagesWithContent = book.pages.filter((p) => p.texto && p.texto.trim().length > 0);
       if (pagesWithContent.length > 0) {
-        return pagesWithContent;
+        // Limpiar cualquier encabezado residual para que el lector muestre la página limpia
+        return pagesWithContent.map((p, idx) => ({
+          ...p,
+          numero: p.numero || idx + 1,
+          texto: p.texto
+            .replace(/^\s*#{1,3}\s*P[aá]gina\s*\d+\s*\n*/i, '')
+            .replace(/^\s*---\s*P[aá]gina\s*\d+\s*---\s*\n*/i, '')
+            .trim(),
+        }));
       }
     }
 
-    // 2. Texto de muestra: parsear separadores "--- Página N ---"
+    // 2. Texto de muestra o continuo: procesar con splitTextIntoPages
     if (book.sampleChapterText && book.sampleChapterText.trim().length > 0) {
-      // Regex con captura del número real de página
-      const separatorRegex = /---\s*Página\s*(\d+)\s*---/g;
-      const matches = [...book.sampleChapterText.matchAll(separatorRegex)];
-
-      if (matches.length > 0) {
-        const parsedPages: BookPage[] = [];
-        matches.forEach((match, i) => {
-          const pageNum = parseInt(match[1], 10);
-          const startIdx = (match.index ?? 0) + match[0].length;
-          const endIdx = matches[i + 1]?.index ?? book.sampleChapterText!.length;
-          const texto = book.sampleChapterText!.slice(startIdx, endIdx).trim();
-          if (texto.length > 0) {
-            parsedPages.push({ numero: pageNum, texto });
-          }
-        });
-        if (parsedPages.length > 0) return parsedPages;
+      const parsed = splitTextIntoPages(book.sampleChapterText);
+      if (parsed.length > 0) {
+        return parsed.map((p) => ({
+          numero: p.numero,
+          texto: p.texto,
+          conteo_palabras: p.conteo_palabras,
+        }));
       }
-
-      // Sin separadores: dividir por longitud fija (~1800 caracteres por página)
-      const fullText = book.sampleChapterText.trim();
-      if (fullText.length > 1800) {
-        const chunkSize = 1800;
-        const chunks: BookPage[] = [];
-        for (let i = 0; i < fullText.length; i += chunkSize) {
-          chunks.push({
-            numero: Math.floor(i / chunkSize) + 1,
-            texto: fullText.slice(i, i + chunkSize).trim(),
-          });
-        }
-        return chunks;
-      }
-
-      return [{ numero: 1, texto: book.sampleChapterText.trim() }];
     }
 
     // 3. Fallback: mostrar sinopsis o mensaje de digitalización pendiente
