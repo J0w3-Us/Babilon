@@ -35,12 +35,12 @@ export function HeroSection() {
     '«En un lugar de la Mancha, de cuyo nombre no quiero acordarme, no ha mucho tiempo que vivía un hidalgo de los de lanza en astillero...»';
 
   return (
-    <section className="relative overflow-hidden pt-16 pb-24 lg:pt-24 lg:pb-32 border-b border-stone-200 dark:border-surface-300 bg-stone-50 dark:bg-surface-50 transition-colors duration-200">
+    <section className="relative overflow-hidden pt-16 pb-24 lg:pt-24 lg:pb-32 border-b border-stone-200/80 dark:border-surface-300 bg-cream-100 dark:bg-surface-50 transition-colors duration-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-10 items-center">
           {/* Left Column: Mission & Impact */}
           <div className="lg:col-span-7 space-y-6">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-stone-100 dark:bg-surface-200 text-stone-700 dark:text-stone-300 text-xs font-semibold uppercase tracking-wider border border-stone-200 dark:border-surface-300">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cream-200 dark:bg-surface-200 text-stone-700 dark:text-stone-300 text-xs font-semibold uppercase tracking-wider border border-stone-200/80 dark:border-surface-300">
               <GraduationCap size={14} className="text-terracotta-600 dark:text-terracotta-500" />
               <span>Archivo Abierto & Patrimonio Literario</span>
             </div>
@@ -60,11 +60,11 @@ export function HeroSection() {
             <div className="pt-2 flex flex-wrap items-center gap-3">
               <Link
                 href="/biblioteca"
-                className="inline-flex items-center gap-2.5 px-6 py-3.5 rounded-xl bg-stone-900 text-stone-50 hover:bg-stone-800 dark:bg-stone-100 dark:text-stone-900 dark:hover:bg-white font-medium text-sm transition-all shadow-subtle cursor-pointer group"
+                className="inline-flex items-center gap-2.5 px-6 py-3.5 rounded-xl bg-stone-900 text-cream-50 hover:bg-stone-800 dark:bg-cream-100 dark:text-stone-900 dark:hover:bg-cream-50 font-medium text-sm transition-all shadow-subtle cursor-pointer group"
               >
                 <BookOpen
                   size={16}
-                  className="text-stone-400 dark:text-stone-600 group-hover:text-stone-200 dark:group-hover:text-stone-900 transition-colors"
+                  className="text-stone-400 dark:text-stone-600 group-hover:text-cream-200 dark:group-hover:text-stone-900 transition-colors"
                 />
                 <span>Entrar a la Biblioteca</span>
                 <ArrowRight
@@ -75,7 +75,7 @@ export function HeroSection() {
 
               <Link
                 href="/subir"
-                className="inline-flex items-center gap-2 px-5 py-3.5 rounded-xl bg-white dark:bg-surface-100 text-stone-700 dark:text-stone-200 font-medium text-sm border border-stone-200 dark:border-surface-300 hover:border-stone-400 dark:hover:border-surface-400 hover:text-stone-900 dark:hover:text-white transition-all shadow-subtle cursor-pointer"
+                className="inline-flex items-center gap-2 px-5 py-3.5 rounded-xl bg-cream-50 dark:bg-surface-100 text-stone-700 dark:text-stone-200 font-medium text-sm border border-stone-200/90 dark:border-surface-300 hover:border-terracotta-300 dark:hover:border-surface-400 hover:text-stone-900 dark:hover:text-white transition-all shadow-subtle cursor-pointer"
               >
                 <UploadCloud size={16} />
                 <span>Digitalizar Obra</span>
@@ -83,7 +83,7 @@ export function HeroSection() {
             </div>
 
             {/* Trust Indicators */}
-            <div className="pt-8 border-t border-stone-200 dark:border-surface-300 grid grid-cols-3 gap-6">
+            <div className="pt-8 border-t border-stone-200/80 dark:border-surface-300 grid grid-cols-3 gap-6">
               <div>
                 <p className="text-xs text-stone-500 dark:text-stone-400 uppercase tracking-wider font-semibold">
                   Acceso Libre
@@ -103,7 +103,7 @@ export function HeroSection() {
                   Almacenamiento
                 </p>
                 <p className="font-serif text-2xl font-bold text-emerald-700 dark:text-emerald-400 mt-1">
-                  Mongose
+                  Mongoose
                 </p>
                 <p className="text-[11px] text-stone-400 dark:text-stone-500 mt-0.5">Catálogo centralizado</p>
               </div>
@@ -112,18 +112,18 @@ export function HeroSection() {
 
           {/* Right Column: Interactive Showcase Card connected to the books API */}
           <div className="lg:col-span-5">
-            <div className="rounded-2xl bg-white dark:bg-surface-100 border border-stone-200 dark:border-surface-300 p-7 shadow-card dark:shadow-dark-card space-y-5">
-              <div className="flex items-center justify-between pb-3.5 border-b border-stone-100 dark:border-surface-300">
+            <div className="rounded-2xl bg-cream-50 dark:bg-surface-100 border border-stone-200/90 dark:border-surface-300 p-7 shadow-card dark:shadow-dark-card space-y-5">
+              <div className="flex items-center justify-between pb-3.5 border-b border-stone-200/60 dark:border-surface-300">
                 <div className="flex items-center gap-2 text-stone-600 dark:text-stone-300 text-xs font-semibold">
                   <Feather size={15} className="text-terracotta-600 dark:text-terracotta-500" />
                   <span>Volumen Destacado de Archivo</span>
                 </div>
-                <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-stone-100 dark:bg-surface-200 text-stone-700 dark:text-stone-300 font-semibold border border-stone-200 dark:border-surface-300">
+                <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-cream-200 dark:bg-surface-200 text-stone-700 dark:text-stone-300 font-semibold border border-stone-200 dark:border-surface-300">
                   Lectura Directa
                 </span>
               </div>
 
-              <div className="aspect-[4/3] rounded-xl overflow-hidden bg-stone-100 dark:bg-surface-200 relative group">
+              <div className="aspect-[4/3] rounded-xl overflow-hidden bg-cream-200 dark:bg-surface-200 relative group">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={cover}
@@ -149,7 +149,7 @@ export function HeroSection() {
 
               <Link
                 href="/biblioteca"
-                className="w-full py-2.5 rounded-lg bg-stone-900 text-stone-50 hover:bg-stone-800 dark:bg-stone-100 dark:text-stone-900 dark:hover:bg-white font-medium text-xs sm:text-sm transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-subtle"
+                className="w-full py-2.5 rounded-lg bg-stone-900 text-cream-50 hover:bg-stone-800 dark:bg-cream-100 dark:text-stone-900 dark:hover:bg-cream-50 font-medium text-xs sm:text-sm transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-subtle"
               >
                 <BookOpen size={15} />
                 <span>Abrir en el Lector Digital</span>

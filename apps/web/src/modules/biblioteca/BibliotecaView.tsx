@@ -57,7 +57,7 @@ export function BibliotecaView() {
   }, [searchParams]);
 
   return (
-    <div className="min-h-screen bg-stone-50 dark:bg-surface-50 text-stone-900 dark:text-stone-100 selection:bg-terracotta-100 selection:text-terracotta-900 font-sans pb-16 transition-colors duration-200">
+    <div className="min-h-screen bg-cream-100 dark:bg-surface-50 text-stone-900 dark:text-stone-100 selection:bg-terracotta-100 selection:text-terracotta-900 font-sans pb-16 transition-colors duration-200">
       {/* Toast Alert */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3 bg-stone-900 text-stone-50 dark:bg-surface-100 dark:text-stone-100 rounded-xl shadow-lg border border-stone-800 dark:border-surface-300 animate-fade-in max-w-md">
@@ -67,7 +67,7 @@ export function BibliotecaView() {
       )}
 
       {/* Subheader / Breadcrumb Bar */}
-      <div className="bg-white dark:bg-surface-100 border-b border-stone-200 dark:border-surface-300 py-3.5 px-4 sm:px-6 lg:px-8 transition-colors duration-200">
+      <div className="bg-cream-50/80 dark:bg-surface-100 border-b border-stone-200/80 dark:border-surface-300 py-3.5 px-4 sm:px-6 lg:px-8 transition-colors duration-200">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link
@@ -93,7 +93,7 @@ export function BibliotecaView() {
 
             <Link
               href="/subir"
-              className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-stone-100 dark:bg-surface-200 text-stone-700 dark:text-stone-300 hover:bg-stone-200 dark:hover:bg-surface-300 text-xs font-medium border border-stone-200 dark:border-surface-300 transition-colors cursor-pointer"
+              className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-cream-200 dark:bg-surface-200 text-stone-700 dark:text-stone-300 hover:bg-cream-300 dark:hover:bg-surface-300 text-xs font-medium border border-stone-200/80 dark:border-surface-300 transition-colors cursor-pointer"
             >
               <UploadCloud size={14} />
               <span>Página de Subida</span>
@@ -101,7 +101,7 @@ export function BibliotecaView() {
 
             <button
               onClick={() => setIsAddModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-stone-900 text-stone-50 hover:bg-stone-800 dark:bg-stone-100 dark:text-stone-900 dark:hover:bg-white text-xs font-semibold shadow-subtle transition-all cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-stone-900 text-cream-50 hover:bg-stone-800 dark:bg-cream-100 dark:text-stone-900 dark:hover:bg-cream-50 text-xs font-semibold shadow-subtle transition-all cursor-pointer"
             >
               <PlusCircle size={14} />
               <span>Digitalizar Obra</span>
@@ -111,10 +111,10 @@ export function BibliotecaView() {
       </div>
 
       {/* Hero & Search Header */}
-      <section className="bg-white dark:bg-surface-100 border-b border-stone-200 dark:border-surface-300 py-10 px-4 sm:px-6 lg:px-8 transition-colors duration-200">
+      <section className="bg-cream-50/70 dark:bg-surface-100 border-b border-stone-200/80 dark:border-surface-300 py-10 px-4 sm:px-6 lg:px-8 transition-colors duration-200">
         <div className="max-w-7xl mx-auto">
           <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-stone-100 dark:bg-surface-200 text-stone-700 dark:text-stone-300 text-xs font-semibold uppercase tracking-wider border border-stone-200 dark:border-surface-300 mb-3">
+            <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-cream-200 dark:bg-surface-200 text-stone-700 dark:text-stone-300 text-xs font-semibold uppercase tracking-wider border border-stone-200/80 dark:border-surface-300 mb-3">
               <Library size={13} className="text-terracotta-600 dark:text-terracotta-500" />
               <span>Catálogo & Preservación Activa</span>
             </div>
@@ -138,7 +138,7 @@ export function BibliotecaView() {
                 placeholder="Buscar por título, autor o palabra clave..."
                 value={catalog.searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-stone-50 dark:bg-surface-200 border border-stone-200 dark:border-surface-300 rounded-lg text-sm text-stone-900 dark:text-stone-100 placeholder:text-stone-400 focus:outline-none focus:border-stone-400 dark:focus:border-surface-400 focus:bg-white dark:focus:bg-surface-100 transition-all shadow-subtle"
+                className="w-full pl-10 pr-4 py-2.5 bg-cream-100 dark:bg-surface-200 border border-stone-200/90 dark:border-surface-300 rounded-xl text-sm text-stone-900 dark:text-stone-100 placeholder:text-stone-400 focus:outline-none focus:border-terracotta-300/70 dark:focus:border-surface-400 focus:bg-cream-50 dark:focus:bg-surface-100 focus:ring-2 focus:ring-terracotta-100/40 dark:focus:ring-surface-400/20 transition-all shadow-subtle"
               />
             </div>
 
@@ -148,7 +148,7 @@ export function BibliotecaView() {
               </span>
               <button
                 onClick={() => refreshBooks()}
-                className="p-2 rounded-lg border border-stone-200 dark:border-surface-300 hover:border-stone-400 dark:hover:border-surface-400 hover:text-stone-900 dark:hover:text-stone-100 transition-colors cursor-pointer"
+                className="p-2 rounded-lg border border-stone-200 dark:border-surface-300 hover:border-stone-400 dark:hover:border-surface-400 hover:text-stone-900 dark:hover:text-stone-100 transition-colors cursor-pointer bg-cream-50 dark:bg-surface-200"
                 title="Actualizar catálogo"
               >
                 <RefreshCw size={14} className={catalog.loading ? 'animate-spin' : ''} />

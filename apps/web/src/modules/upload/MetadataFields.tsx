@@ -48,6 +48,9 @@ export function MetadataFields({
   synopsis,
   onSynopsisChange,
 }: MetadataFieldsProps) {
+  const inputBaseClasses =
+    'w-full px-3.5 py-2.5 bg-cream-100 dark:bg-surface-200 border border-stone-200/90 dark:border-surface-300 rounded-xl text-sm text-stone-900 dark:text-stone-100 placeholder:text-stone-400 focus:outline-none focus:border-terracotta-300/70 dark:focus:border-surface-400 focus:bg-cream-50 dark:focus:bg-surface-100 focus:ring-2 focus:ring-terracotta-100/40 dark:focus:ring-surface-400/20 transition-all';
+
   return (
     <div className="space-y-4">
       <div>
@@ -60,7 +63,7 @@ export function MetadataFields({
           placeholder="ej. Ensayos sobre la lectura y la memoria"
           value={title}
           onChange={(e) => onTitleChange(e.target.value)}
-          className="w-full px-3 py-2 bg-stone-50 dark:bg-surface-200 border border-stone-200 dark:border-surface-300 rounded-lg text-sm text-stone-900 dark:text-stone-100 placeholder:text-stone-400 focus:outline-none focus:border-stone-400 dark:focus:border-surface-400 focus:bg-white dark:focus:bg-surface-100 transition-colors"
+          className={inputBaseClasses}
         />
       </div>
 
@@ -75,7 +78,7 @@ export function MetadataFields({
             placeholder="ej. Jorge Luis Borges"
             value={author}
             onChange={(e) => onAuthorChange(e.target.value)}
-            className="w-full px-3 py-2 bg-stone-50 dark:bg-surface-200 border border-stone-200 dark:border-surface-300 rounded-lg text-sm text-stone-900 dark:text-stone-100 placeholder:text-stone-400 focus:outline-none focus:border-stone-400 dark:focus:border-surface-400 focus:bg-white dark:focus:bg-surface-100 transition-colors"
+            className={inputBaseClasses}
           />
         </div>
 
@@ -88,7 +91,7 @@ export function MetadataFields({
             placeholder="ej. 978-84-376-0000-0"
             value={isbn}
             onChange={(e) => onIsbnChange(e.target.value)}
-            className="w-full px-3 py-2 bg-stone-50 dark:bg-surface-200 border border-stone-200 dark:border-surface-300 rounded-lg text-sm font-mono text-stone-900 dark:text-stone-100 placeholder:text-stone-400 focus:outline-none focus:border-stone-400 dark:focus:border-surface-400 focus:bg-white dark:focus:bg-surface-100 transition-colors"
+            className={`${inputBaseClasses} font-mono`}
           />
         </div>
       </div>
@@ -101,7 +104,7 @@ export function MetadataFields({
           <select
             value={genre}
             onChange={(e) => onGenreChange(e.target.value as BookGenre)}
-            className="w-full px-3 py-2 bg-stone-50 dark:bg-surface-200 border border-stone-200 dark:border-surface-300 rounded-lg text-sm text-stone-900 dark:text-stone-100 focus:outline-none focus:border-stone-400 dark:focus:border-surface-400 focus:bg-white dark:focus:bg-surface-100 transition-colors"
+            className={inputBaseClasses}
           >
             {GENRES_LIST.map((g) => (
               <option key={g} value={g}>
@@ -121,7 +124,7 @@ export function MetadataFields({
             max={new Date().getFullYear() + 2}
             value={year}
             onChange={(e) => onYearChange(parseInt(e.target.value) || 0)}
-            className="w-full px-3 py-2 bg-stone-50 dark:bg-surface-200 border border-stone-200 dark:border-surface-300 rounded-lg text-sm text-stone-900 dark:text-stone-100 focus:outline-none focus:border-stone-400 dark:focus:border-surface-400 focus:bg-white dark:focus:bg-surface-100 transition-colors"
+            className={inputBaseClasses}
           />
         </div>
 
@@ -134,7 +137,7 @@ export function MetadataFields({
             placeholder="ej. Babilonia Clásicos"
             value={publisher}
             onChange={(e) => onPublisherChange(e.target.value)}
-            className="w-full px-3 py-2 bg-stone-50 dark:bg-surface-200 border border-stone-200 dark:border-surface-300 rounded-lg text-sm text-stone-900 dark:text-stone-100 placeholder:text-stone-400 focus:outline-none focus:border-stone-400 dark:focus:border-surface-400 focus:bg-white dark:focus:bg-surface-100 transition-colors"
+            className={inputBaseClasses}
           />
         </div>
       </div>
@@ -148,7 +151,7 @@ export function MetadataFields({
           placeholder="https://ejemplo.org/portada.jpg"
           value={coverUrl}
           onChange={(e) => onCoverUrlChange(e.target.value)}
-          className="w-full px-3 py-2 bg-stone-50 dark:bg-surface-200 border border-stone-200 dark:border-surface-300 rounded-lg text-sm text-stone-900 dark:text-stone-100 placeholder:text-stone-400 focus:outline-none focus:border-stone-400 dark:focus:border-surface-400 focus:bg-white dark:focus:bg-surface-100 transition-colors"
+          className={inputBaseClasses}
         />
       </div>
 
@@ -161,7 +164,7 @@ export function MetadataFields({
           placeholder="Breve reseña sobre el contenido de la obra..."
           value={synopsis}
           onChange={(e) => onSynopsisChange(e.target.value)}
-          className="w-full px-3 py-2 bg-stone-50 dark:bg-surface-200 border border-stone-200 dark:border-surface-300 rounded-lg text-sm text-stone-900 dark:text-stone-100 placeholder:text-stone-400 focus:outline-none focus:border-stone-400 dark:focus:border-surface-400 focus:bg-white dark:focus:bg-surface-100 transition-colors"
+          className={inputBaseClasses}
         />
       </div>
     </div>

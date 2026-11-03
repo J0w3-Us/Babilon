@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, useMemo } from 'react';
+import { useRef, useState, useMemo, useCallback } from 'react';
 import {
   UploadCloud,
   Loader2,
@@ -15,6 +15,7 @@ import {
   ChevronRight,
   BookOpen,
   Layers,
+  File,
 } from 'lucide-react';
 import { splitTextIntoPages, ParsedPage } from '@/lib/pageSplitter';
 
@@ -40,6 +41,7 @@ export function FileDropzone({
   const [viewMode, setViewMode] = useState<'preview' | 'editor'>('preview');
   const [pageLayout, setPageLayout] = useState<'carousel' | 'continuous'>('carousel');
   const [activePageIndex, setActivePageIndex] = useState<number>(0);
+  const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Parsear texto en páginas reales
@@ -67,46 +69,70 @@ export function FileDropzone({
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+  }, []);
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragOver(false);
+      const f = e.dataTransfer.files?.[0];
+      if (f) onFileSelect(f);
+    },
+    [onFileSelect]
+  );
+
   const totalPagesCount = parsedPages.length || previewEstimatedPages || 1;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* ── Zona de Estado / Carga de Archivo ── */}
       {isScanning ? (
-        <div className="p-6 border border-dashed border-amber-300 dark:border-amber-700 rounded-xl bg-amber-50 dark:bg-amber-950/30 text-center">
+        <div className="p-7 border-2 border-dashed border-amber-300/70 dark:border-amber-700/50 rounded-2xl bg-amber-50/60 dark:bg-amber-950/20 text-center">
           <div className="flex justify-center mb-3">
-            <div className="w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-900/60 flex items-center justify-center text-amber-600 dark:text-amber-400 animate-pulse">
-              <Loader2 size={26} className="animate-spin" />
+            <div className="w-14 h-14 rounded-2xl bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center text-amber-600 dark:text-amber-400">
+              <Loader2 size={28} className="animate-spin" />
             </div>
           </div>
-          <p className="text-sm font-semibold text-amber-900 dark:text-amber-300">
+          <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">
             Escaneando documento y separando páginas…
           </p>
-          <p className="text-xs text-amber-700 dark:text-amber-500 mt-1">
+          <p className="text-xs text-amber-700/80 dark:text-amber-400/70 mt-1.5">
             Preservando estructura de hojas, texto y encabezados
           </p>
         </div>
       ) : uploadedFileName ? (
-        <div className="p-4 border border-emerald-200 dark:border-emerald-800 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/60 flex items-center justify-center text-emerald-700 dark:text-emerald-400 shrink-0">
-            <FileText size={22} />
+        /* ── Archivo cargado exitosamente ── */
+        <div className="p-5 border border-emerald-200/80 dark:border-emerald-800/40 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/15 flex items-start gap-4">
+          <div className="w-12 h-12 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center text-emerald-700 dark:text-emerald-400 shrink-0 mt-0.5">
+            <FileText size={24} />
           </div>
 
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2.5 flex-wrap">
               <p className="text-sm font-semibold text-stone-900 dark:text-stone-100 truncate max-w-xs">
                 {uploadedFileName}
               </p>
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-terracotta-100 dark:bg-terracotta-900/40 text-terracotta-800 dark:text-terracotta-300 border border-terracotta-200 dark:border-terracotta-800 shrink-0">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-terracotta-50 dark:bg-terracotta-900/30 text-terracotta-700 dark:text-terracotta-300 border border-terracotta-200/60 dark:border-terracotta-800/40 shrink-0">
                 <Sparkles size={10} /> Separación Automática
               </span>
               {fullText && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 shrink-0">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100/60 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/40 shrink-0">
                   <CheckCircle2 size={10} /> {parsedPages.length} {parsedPages.length === 1 ? 'página' : 'páginas'}
                 </span>
               )}
             </div>
-            <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
+            <p className="text-xs text-stone-500 dark:text-stone-400 mt-1">
               Hojas identificadas y listas para visualización y archivo
             </p>
           </div>
@@ -116,7 +142,7 @@ export function FileDropzone({
               <button
                 type="button"
                 onClick={handleDownloadMd}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-stone-900 dark:bg-stone-100 text-stone-50 dark:text-stone-900 text-xs font-semibold hover:bg-stone-700 dark:hover:bg-white transition-all shadow-sm"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-stone-900 dark:bg-cream-100 text-cream-50 dark:text-stone-900 text-xs font-semibold hover:bg-stone-700 dark:hover:bg-cream-50 transition-all shadow-sm"
                 title="Descargar copia del texto estructurado"
               >
                 <Download size={12} /> Exportar .md
@@ -126,7 +152,7 @@ export function FileDropzone({
             <button
               type="button"
               onClick={onClearFile}
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-stone-200 dark:border-surface-300 text-xs font-medium text-stone-600 dark:text-stone-400 hover:bg-rose-50 hover:border-rose-200 hover:text-rose-700 dark:hover:bg-rose-950/30 dark:hover:border-rose-800 dark:hover:text-rose-400 transition-all"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-stone-200 dark:border-surface-300 text-xs font-medium text-stone-500 dark:text-stone-400 hover:bg-rose-50/80 hover:border-rose-200 hover:text-rose-700 dark:hover:bg-rose-950/20 dark:hover:border-rose-800/40 dark:hover:text-rose-400 transition-all"
               title="Quitar archivo"
             >
               <X size={13} /> Quitar
@@ -134,23 +160,44 @@ export function FileDropzone({
           </div>
         </div>
       ) : (
-        <div className="p-6 border border-dashed border-stone-300 dark:border-surface-300 rounded-xl bg-stone-50 dark:bg-surface-200 text-center hover:bg-stone-100 dark:hover:bg-surface-300/40 transition-colors">
-          <div className="flex justify-center mb-2">
-            <div className="w-12 h-12 rounded-full bg-stone-200 dark:bg-surface-300 flex items-center justify-center text-stone-700 dark:text-stone-300">
-              <UploadCloud size={26} />
+        /* ── Dropzone vacía — zona de arrastre y selección ── */
+        <div
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          className={`relative p-8 border-2 border-dashed rounded-2xl text-center transition-all duration-200 ${
+            isDragOver
+              ? 'border-terracotta-400 bg-terracotta-50/40 dark:bg-terracotta-950/15 dark:border-terracotta-600/50 scale-[1.01]'
+              : 'border-stone-300/80 dark:border-surface-300 bg-cream-100/50 dark:bg-surface-200/50 hover:bg-cream-200/40 dark:hover:bg-surface-300/30 hover:border-stone-400/60 dark:hover:border-surface-400/50'
+          }`}
+        >
+          {/* Icono central */}
+          <div className="flex justify-center mb-4">
+            <div
+              className={`w-16 h-16 rounded-2xl flex items-center justify-center transition-colors ${
+                isDragOver
+                  ? 'bg-terracotta-100 dark:bg-terracotta-900/30 text-terracotta-600 dark:text-terracotta-400'
+                  : 'bg-stone-100 dark:bg-surface-300 text-stone-500 dark:text-stone-400'
+              }`}
+            >
+              {isDragOver ? (
+                <File size={30} className="animate-pulse" />
+              ) : (
+                <UploadCloud size={30} />
+              )}
             </div>
           </div>
 
-          <p className="text-sm font-semibold text-stone-800 dark:text-stone-100 mb-0.5">
-            Cargar documento (PDF, Markdown o Texto)
+          <p className="text-sm font-semibold text-stone-800 dark:text-stone-100 mb-1">
+            {isDragOver ? 'Suelta el archivo aquí' : 'Arrastra un documento o selecciona uno'}
           </p>
-          <p className="text-xs text-stone-500 dark:text-stone-400">
-            Las páginas se separarán fielmente respetando el formato del documento
+          <p className="text-xs text-stone-500 dark:text-stone-400 mb-5 max-w-sm mx-auto">
+            Las páginas se separarán fielmente respetando el formato del documento. Soporta PDF, Markdown y texto plano.
           </p>
 
-          <label className="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-stone-900 dark:bg-surface-300 text-stone-50 dark:text-stone-100 text-xs font-semibold cursor-pointer hover:bg-stone-800 dark:hover:bg-surface-400 transition-all shadow-subtle">
+          <label className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-stone-900 dark:bg-cream-100 text-cream-50 dark:text-stone-900 text-xs font-semibold cursor-pointer hover:bg-stone-700 dark:hover:bg-cream-50 transition-all shadow-sm">
             <UploadCloud size={14} />
-            <span>Seleccionar Archivo (PDF / TXT / MD)</span>
+            <span>Seleccionar Archivo</span>
             <input
               ref={fileInputRef}
               type="file"
@@ -159,32 +206,36 @@ export function FileDropzone({
               className="hidden"
             />
           </label>
+
+          <p className="mt-3 text-[11px] text-stone-400 dark:text-stone-500 font-mono">
+            PDF · TXT · MD
+          </p>
         </div>
       )}
 
       {/* ── Encabezado de la Sección de Visualización de Páginas ── */}
       <div>
-        <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <div className="flex items-center gap-2.5">
             <label className="text-xs font-semibold text-stone-700 dark:text-stone-300 uppercase tracking-wider flex items-center gap-1.5">
               <BookOpen size={13} className="text-terracotta-600 dark:text-terracotta-400" />
               <span>Visualizador de Páginas</span>
               {parsedPages.length > 0 && (
-                <span className="text-[11px] font-mono font-normal lowercase opacity-75">
+                <span className="text-[11px] font-mono font-normal lowercase opacity-70">
                   ({parsedPages.length} {parsedPages.length === 1 ? 'página' : 'páginas'})
                 </span>
               )}
             </label>
 
             {/* Alternador de Modo: Vista de Hojas vs Editor Crudo */}
-            <div className="flex items-center bg-stone-200 dark:bg-surface-300 rounded-lg p-0.5 text-[11px]">
+            <div className="flex items-center bg-stone-100 dark:bg-surface-300 rounded-lg p-0.5 text-[11px]">
               <button
                 type="button"
                 onClick={() => setViewMode('preview')}
                 className={`px-2.5 py-1 rounded-md flex items-center gap-1.5 font-medium transition-all ${
                   viewMode === 'preview'
-                    ? 'bg-white dark:bg-surface-100 text-stone-900 dark:text-stone-100 shadow-xs font-semibold'
-                    : 'text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-200'
+                    ? 'bg-cream-50 dark:bg-surface-100 text-stone-900 dark:text-stone-100 shadow-xs font-semibold'
+                    : 'text-stone-500 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-200'
                 }`}
               >
                 <Eye size={12} /> Hojas Separadas (PDF)
@@ -194,8 +245,8 @@ export function FileDropzone({
                 onClick={() => setViewMode('editor')}
                 className={`px-2.5 py-1 rounded-md flex items-center gap-1.5 font-medium transition-all ${
                   viewMode === 'editor'
-                    ? 'bg-white dark:bg-surface-100 text-stone-900 dark:text-stone-100 shadow-xs font-semibold'
-                    : 'text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-200'
+                    ? 'bg-cream-50 dark:bg-surface-100 text-stone-900 dark:text-stone-100 shadow-xs font-semibold'
+                    : 'text-stone-500 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-200'
                 }`}
               >
                 <Code size={12} /> Editor Markdown
@@ -205,15 +256,15 @@ export function FileDropzone({
 
           {/* Controles para la Vista Previa de Hojas */}
           {viewMode === 'preview' && parsedPages.length > 1 && (
-            <div className="flex items-center gap-2">
-              <div className="flex items-center bg-stone-200 dark:bg-surface-300 rounded p-0.5 text-[10px]">
+            <div className="flex items-center gap-2.5">
+              <div className="flex items-center bg-stone-100 dark:bg-surface-300 rounded-lg p-0.5 text-[10px]">
                 <button
                   type="button"
                   onClick={() => setPageLayout('carousel')}
-                  className={`px-2 py-0.5 rounded transition-all ${
+                  className={`px-2.5 py-1 rounded-md transition-all ${
                     pageLayout === 'carousel'
-                      ? 'bg-white dark:bg-surface-100 text-stone-900 dark:text-stone-100 font-semibold shadow-xs'
-                      : 'text-stone-600 dark:text-stone-400'
+                      ? 'bg-cream-50 dark:bg-surface-100 text-stone-900 dark:text-stone-100 font-semibold shadow-xs'
+                      : 'text-stone-500 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-200'
                   }`}
                 >
                   Página a Página
@@ -221,10 +272,10 @@ export function FileDropzone({
                 <button
                   type="button"
                   onClick={() => setPageLayout('continuous')}
-                  className={`px-2 py-0.5 rounded transition-all ${
+                  className={`px-2.5 py-1 rounded-md transition-all ${
                     pageLayout === 'continuous'
-                      ? 'bg-white dark:bg-surface-100 text-stone-900 dark:text-stone-100 font-semibold shadow-xs'
-                      : 'text-stone-600 dark:text-stone-400'
+                      ? 'bg-cream-50 dark:bg-surface-100 text-stone-900 dark:text-stone-100 font-semibold shadow-xs'
+                      : 'text-stone-500 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-200'
                   }`}
                 >
                   Todas las Hojas
@@ -232,24 +283,24 @@ export function FileDropzone({
               </div>
 
               {pageLayout === 'carousel' && (
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1.5">
                   <button
                     type="button"
                     disabled={safePageIndex === 0}
                     onClick={() => setActivePageIndex((p) => Math.max(0, p - 1))}
-                    className="p-1 rounded border border-stone-200 dark:border-surface-300 bg-stone-50 dark:bg-surface-200 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-stone-100"
+                    className="p-1.5 rounded-lg border border-stone-200 dark:border-surface-300 bg-cream-50 dark:bg-surface-200 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-cream-200 dark:hover:bg-surface-300 transition-colors"
                     title="Página anterior"
                   >
                     <ChevronLeft size={13} />
                   </button>
-                  <span className="text-[11px] font-mono px-1 font-semibold text-stone-700 dark:text-stone-300">
+                  <span className="text-[11px] font-mono px-1.5 font-semibold text-stone-600 dark:text-stone-300 tabular-nums">
                     {safePageIndex + 1} / {parsedPages.length}
                   </span>
                   <button
                     type="button"
                     disabled={safePageIndex >= parsedPages.length - 1}
                     onClick={() => setActivePageIndex((p) => Math.min(parsedPages.length - 1, p + 1))}
-                    className="p-1 rounded border border-stone-200 dark:border-surface-300 bg-stone-50 dark:bg-surface-200 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-stone-100"
+                    className="p-1.5 rounded-lg border border-stone-200 dark:border-surface-300 bg-cream-50 dark:bg-surface-200 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-cream-200 dark:hover:bg-surface-300 transition-colors"
                     title="Página siguiente"
                   >
                     <ChevronRight size={13} />
@@ -263,25 +314,27 @@ export function FileDropzone({
         {/* ── CUERPO PRINCIPAL DEL VISOR ── */}
         {viewMode === 'editor' ? (
           /* Modo Editor Manual */
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <textarea
               rows={11}
               placeholder="El contenido transcrito o extraído se mostrará aquí dividido por '--- Página N ---'..."
               value={fullText}
               onChange={(e) => onTextChange(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-stone-50 dark:bg-surface-200 border border-stone-200 dark:border-surface-300 rounded-lg text-sm font-mono text-stone-900 dark:text-stone-100 focus:outline-none focus:border-stone-400 dark:focus:border-surface-400 focus:bg-white dark:focus:bg-surface-100 transition-colors"
+              className="w-full px-4 py-3 bg-cream-100 dark:bg-surface-200 border border-stone-200 dark:border-surface-300 rounded-xl text-sm font-mono text-stone-900 dark:text-stone-100 placeholder:text-stone-400/70 focus:outline-none focus:border-terracotta-300/60 dark:focus:border-surface-400 focus:bg-cream-50 dark:focus:bg-surface-100 focus:ring-2 focus:ring-terracotta-100/40 dark:focus:ring-surface-400/20 transition-all"
             />
-            <p className="text-[11px] text-stone-400 dark:text-stone-500 font-mono">
-              Tip: Puedes separar páginas manualmente usando <code>--- Página 2 ---</code> o <code>---</code>
+            <p className="text-[11px] text-stone-400 dark:text-stone-500 font-mono px-1">
+              Tip: Puedes separar páginas manualmente usando <code className="px-1 py-0.5 bg-stone-100 dark:bg-surface-300 rounded">--- Página 2 ---</code> o <code className="px-1 py-0.5 bg-stone-100 dark:bg-surface-300 rounded">---</code>
             </p>
           </div>
         ) : (
           /* Modo Visualización Real de Hojas / PDF */
-          <div className="w-full min-h-[300px] max-h-[460px] overflow-y-auto bg-stone-100 dark:bg-stone-950 p-4 rounded-xl border border-stone-200 dark:border-surface-300 space-y-4">
+          <div className="w-full min-h-[300px] max-h-[460px] overflow-y-auto bg-cream-200/50 dark:bg-stone-950 p-5 rounded-2xl border border-stone-200/80 dark:border-surface-300 space-y-5">
             {parsedPages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-48 text-stone-400 dark:text-stone-500 gap-2">
-                <FileText size={32} className="opacity-40" />
-                <p className="text-xs">No hay páginas para previsualizar. Carga un archivo para comenzar.</p>
+              <div className="flex flex-col items-center justify-center h-48 text-stone-400 dark:text-stone-500 gap-3">
+                <div className="w-14 h-14 rounded-2xl bg-stone-100 dark:bg-surface-300 flex items-center justify-center">
+                  <FileText size={28} className="opacity-40" />
+                </div>
+                <p className="text-xs text-center max-w-xs">No hay páginas para previsualizar. Carga un archivo para comenzar.</p>
               </div>
             ) : pageLayout === 'carousel' ? (
               /* Vista Página por Página (Estilo Hoja Individual con Sombra) */
@@ -289,9 +342,9 @@ export function FileDropzone({
                 {(() => {
                   const page = parsedPages[safePageIndex] || parsedPages[0];
                   return (
-                    <div className="bg-white dark:bg-[#1E1E1E] text-stone-800 dark:text-stone-100 rounded-lg shadow-md border border-stone-200 dark:border-stone-800 p-6 sm:p-8 transition-all">
+                    <div className="bg-cream-50 dark:bg-surface-100 text-stone-800 dark:text-stone-100 rounded-xl shadow-card dark:shadow-dark-card border border-stone-200/60 dark:border-surface-300 p-7 sm:p-9 transition-all">
                       {/* Cabecera de la Hoja */}
-                      <div className="flex items-center justify-between border-b border-stone-200 dark:border-stone-800 pb-2.5 mb-5 text-[11px] font-mono text-stone-400 dark:text-stone-500">
+                      <div className="flex items-center justify-between border-b border-stone-200/60 dark:border-surface-300 pb-3 mb-6 text-[11px] font-mono text-stone-400 dark:text-stone-500">
                         <span className="font-semibold text-terracotta-600 dark:text-terracotta-400 uppercase tracking-widest flex items-center gap-1.5">
                           <Layers size={12} />
                           Página {page.numero} de {parsedPages.length}
@@ -305,7 +358,7 @@ export function FileDropzone({
                       </div>
 
                       {/* Pie de Hoja */}
-                      <div className="border-t border-stone-100 dark:border-stone-800/80 pt-3 mt-6 flex justify-between items-center text-[10px] font-mono text-stone-400">
+                      <div className="border-t border-stone-100 dark:border-surface-300 pt-3 mt-7 flex justify-between items-center text-[10px] font-mono text-stone-400 dark:text-stone-500">
                         <span>Babilon Digital Reader</span>
                         <span>— {page.numero} —</span>
                       </div>
@@ -319,9 +372,9 @@ export function FileDropzone({
                 {parsedPages.map((page) => (
                   <div
                     key={page.numero}
-                    className="bg-white dark:bg-[#1E1E1E] text-stone-800 dark:text-stone-100 rounded-lg shadow-md border border-stone-200 dark:border-stone-800 p-6 sm:p-8"
+                    className="bg-cream-50 dark:bg-surface-100 text-stone-800 dark:text-stone-100 rounded-xl shadow-card dark:shadow-dark-card border border-stone-200/60 dark:border-surface-300 p-7 sm:p-9"
                   >
-                    <div className="flex items-center justify-between border-b border-stone-200 dark:border-stone-800 pb-2.5 mb-5 text-[11px] font-mono text-stone-400 dark:text-stone-500">
+                    <div className="flex items-center justify-between border-b border-stone-200/60 dark:border-surface-300 pb-3 mb-6 text-[11px] font-mono text-stone-400 dark:text-stone-500">
                       <span className="font-semibold text-terracotta-600 dark:text-terracotta-400 uppercase tracking-widest flex items-center gap-1.5">
                         <Layers size={12} />
                         Página {page.numero} de {parsedPages.length}
@@ -333,7 +386,7 @@ export function FileDropzone({
                       {page.texto}
                     </div>
 
-                    <div className="border-t border-stone-100 dark:border-stone-800/80 pt-3 mt-6 flex justify-between items-center text-[10px] font-mono text-stone-400">
+                    <div className="border-t border-stone-100 dark:border-surface-300 pt-3 mt-7 flex justify-between items-center text-[10px] font-mono text-stone-400 dark:text-stone-500">
                       <span>Babilon Digital Reader</span>
                       <span>— {page.numero} —</span>
                     </div>

@@ -111,8 +111,8 @@ export function BookReader({
           theme === 'dark'
             ? 'bg-surface-50 text-stone-100 border-surface-300'
             : theme === 'parchment'
-            ? 'bg-[#F9F7F1] text-stone-900 border-stone-200'
-            : 'bg-white text-stone-900 border-stone-200'
+            ? 'bg-[#F7F3E9] text-stone-900 border-stone-200/80'
+            : 'bg-cream-50 text-stone-900 border-stone-200/80'
         }`}
       >
         {/* Top Toolbar */}
@@ -121,8 +121,8 @@ export function BookReader({
             theme === 'dark'
               ? 'bg-surface-100 border-surface-300 text-stone-100'
               : theme === 'parchment'
-              ? 'bg-[#F2EFE8] border-stone-200 text-stone-900'
-              : 'bg-stone-50 border-stone-200 text-stone-900'
+              ? 'bg-[#EFE9DC] border-stone-200/80 text-stone-900'
+              : 'bg-cream-100 border-stone-200/80 text-stone-900'
           }`}
         >
           <div className="flex items-center gap-3">
@@ -263,8 +263,8 @@ export function BookReader({
             theme === 'dark'
               ? 'bg-surface-100 border-surface-300'
               : theme === 'parchment'
-              ? 'bg-[#F2EFE8] border-stone-200'
-              : 'bg-stone-50 border-stone-200'
+              ? 'bg-[#EFE9DC] border-stone-200/80'
+              : 'bg-cream-100 border-stone-200/80'
           }`}
         >
           <button

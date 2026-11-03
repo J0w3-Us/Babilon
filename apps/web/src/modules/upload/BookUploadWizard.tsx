@@ -47,15 +47,15 @@ export function BookUploadWizard({
   };
 
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-surface-100 text-stone-900 dark:text-stone-100 transition-colors duration-200">
+    <div className="flex flex-col h-full bg-cream-50 dark:bg-surface-100 text-stone-900 dark:text-stone-100 transition-colors duration-200">
       {/* Pestañas de Navegación Editorial */}
-      <div className="flex border-b border-stone-200 dark:border-surface-300 bg-stone-50 dark:bg-surface-200 px-6 pt-3">
+      <div className="flex border-b border-stone-200/80 dark:border-surface-300 bg-cream-100/60 dark:bg-surface-200 px-6 pt-3">
         <button
           type="button"
           onClick={() => actions.setUploadTab('meta')}
           className={`pb-3 px-3.5 text-xs font-semibold uppercase tracking-wider border-b-2 transition-all cursor-pointer ${
             uploadTab === 'meta'
-              ? 'border-stone-900 text-stone-900 dark:border-stone-100 dark:text-stone-100'
+              ? 'border-stone-900 text-stone-900 dark:border-cream-100 dark:text-stone-100'
               : 'border-transparent text-stone-500 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-200'
           }`}
         >
@@ -66,7 +66,7 @@ export function BookUploadWizard({
           onClick={() => actions.setUploadTab('content')}
           className={`pb-3 px-3.5 text-xs font-semibold uppercase tracking-wider border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${
             uploadTab === 'content'
-              ? 'border-stone-900 text-stone-900 dark:border-stone-100 dark:text-stone-100'
+              ? 'border-stone-900 text-stone-900 dark:border-cream-100 dark:text-stone-100'
               : 'border-transparent text-stone-500 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-200'
           }`}
         >
@@ -80,12 +80,12 @@ export function BookUploadWizard({
       {/* Alerta de Estado */}
       {statusMessage && (
         <div
-          className={`mx-6 mt-4 p-3 rounded-lg flex items-center gap-2.5 text-xs font-medium border ${
+          className={`mx-6 mt-4 p-3 rounded-xl flex items-center gap-2.5 text-xs font-medium border ${
             statusMessage.type === 'success'
-              ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+              ? 'bg-emerald-50/70 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-300 border-emerald-200/80 dark:border-emerald-800'
               : statusMessage.type === 'info'
-              ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-300 border-amber-200 dark:border-amber-800'
-              : 'bg-rose-50 dark:bg-rose-950/40 text-rose-900 dark:text-rose-300 border-rose-200 dark:border-rose-800'
+              ? 'bg-amber-50/70 dark:bg-amber-950/40 text-amber-900 dark:text-amber-300 border-amber-200/80 dark:border-amber-800'
+              : 'bg-rose-50/70 dark:bg-rose-950/40 text-rose-900 dark:text-rose-300 border-rose-200/80 dark:border-rose-800'
           }`}
         >
           {statusMessage.type === 'success' ? (
@@ -133,7 +133,7 @@ export function BookUploadWizard({
         )}
 
         {/* Pie de Acciones */}
-        <div className="pt-3 border-t border-stone-200 dark:border-surface-300 flex items-center justify-between">
+        <div className="pt-3 border-t border-stone-200/80 dark:border-surface-300 flex items-center justify-between">
           {uploadTab === 'meta' ? (
             <button
               type="button"
@@ -157,7 +157,7 @@ export function BookUploadWizard({
               <button
                 type="button"
                 onClick={onCancel}
-                className="px-3.5 py-2 rounded-lg border border-stone-200 dark:border-surface-300 text-xs font-medium text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-surface-200 transition-colors cursor-pointer"
+                className="px-3.5 py-2 rounded-lg border border-stone-200 dark:border-surface-300 text-xs font-medium text-stone-700 dark:text-stone-300 hover:bg-cream-200 dark:hover:bg-surface-200 transition-colors cursor-pointer"
               >
                 Cancelar
               </button>
@@ -166,7 +166,7 @@ export function BookUploadWizard({
             <button
               type="submit"
               disabled={isSubmitting || isScanning}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-stone-900 text-stone-50 hover:bg-stone-800 dark:bg-stone-100 dark:text-stone-900 dark:hover:bg-white font-semibold text-xs transition-all shadow-subtle disabled:opacity-50 cursor-pointer"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-stone-900 text-cream-50 hover:bg-stone-800 dark:bg-cream-100 dark:text-stone-900 dark:hover:bg-cream-50 font-semibold text-xs transition-all shadow-subtle disabled:opacity-50 cursor-pointer"
             >
               {isSubmitting ? (
                 <>

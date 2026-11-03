@@ -6,27 +6,27 @@
 
 @layer base {
   :root {
-    /* Opción C: Moderno Suizo / Minimalismo Contemporáneo */
-    --bg-main: #FBFBFC;
-    --bg-card: #FFFFFF;
-    --bg-muted: #F3F4F6;
-    --border-subtle: #E5E7EB;
-    --text-primary: #111827;
-    --text-secondary: #4B5563;
-    --text-muted: #6B7280;
+    /* Crema cálido editorial — neutrales tintados terracota */
+    --bg-main: #FBF8F3;
+    --bg-card: #FEFCF9;
+    --bg-muted: #F4F1EC;
+    --border-subtle: #E8E4DE;
+    --text-primary: #1A1816;
+    --text-secondary: #4D4840;
+    --text-muted: #6E675D;
     --accent-terracotta: #C85A32;
     --accent-hover: #B24B25;
   }
 
   .dark {
-    /* Dark Mode Suizo: Gris piedra grafito (#121214 / #18181B) */
-    --bg-main: #121214;
-    --bg-card: #18181B;
-    --bg-muted: #232328;
-    --border-subtle: #27272A;
-    --text-primary: #F4F4F5;
-    --text-secondary: #A1A1AA;
-    --text-muted: #71717A;
+    /* Dark Mode: Grafito cálido — tinte terracota sutil */
+    --bg-main: #141312;
+    --bg-card: #1B1918;
+    --bg-muted: #252321;
+    --border-subtle: #2C2A27;
+    --text-primary: #F4F0EB;
+    --text-secondary: #A39E94;
+    --text-muted: #746E64;
     --accent-terracotta: #D97856;
     --accent-hover: #E28867;
   }
@@ -55,12 +55,12 @@
 
   ::selection {
     background-color: #FEE4DB;
-    color: #943B1A;
+    color: #8C381A;
   }
 
   .dark ::selection {
-    background-color: rgba(217, 120, 86, 0.3);
-    color: #F4F4F5;
+    background-color: rgba(217, 120, 86, 0.25);
+    color: #F4F0EB;
   }
 }
 
@@ -68,13 +68,13 @@
 /* Glass & Surface Effects                       */
 /* ============================================= */
 .glass-header {
-  background: rgba(251, 251, 252, 0.9);
+  background: rgba(251, 248, 243, 0.92);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
 
 .dark .glass-header {
-  background: rgba(18, 18, 20, 0.9);
+  background: rgba(20, 19, 18, 0.92);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
 }

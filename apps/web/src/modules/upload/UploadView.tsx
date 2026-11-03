@@ -13,9 +13,9 @@ export function UploadView() {
   };
 
   return (
-    <div className="min-h-screen bg-stone-50 dark:bg-surface-50 text-stone-900 dark:text-stone-100 selection:bg-terracotta-100 selection:text-terracotta-900 font-sans pb-16 transition-colors duration-200">
+    <div className="min-h-screen bg-cream-100 dark:bg-surface-50 text-stone-900 dark:text-stone-100 selection:bg-terracotta-100 selection:text-terracotta-900 font-sans pb-16 transition-colors duration-200">
       {/* Subheader / Breadcrumb Bar */}
-      <div className="bg-white dark:bg-surface-100 border-b border-stone-200 dark:border-surface-300 py-3.5 px-4 sm:px-6 lg:px-8 transition-colors duration-200">
+      <div className="bg-cream-50/80 dark:bg-surface-100 border-b border-stone-200/80 dark:border-surface-300 py-3.5 px-4 sm:px-6 lg:px-8 transition-colors duration-200">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link
@@ -41,7 +41,7 @@ export function UploadView() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-10">
         {/* Cabecera Editorial */}
         <div className="mb-7">
-          <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-stone-100 dark:bg-surface-200 text-stone-700 dark:text-stone-300 text-[11px] font-semibold uppercase tracking-wider border border-stone-200 dark:border-surface-300 mb-2.5">
+          <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-cream-200 dark:bg-surface-200 text-stone-700 dark:text-stone-300 text-[11px] font-semibold uppercase tracking-wider border border-stone-200/80 dark:border-surface-300 mb-2.5">
             <UploadCloud size={12} className="text-terracotta-600 dark:text-terracotta-500" />
             <span>Ingesta Literaria</span>
           </div>
@@ -54,7 +54,7 @@ export function UploadView() {
         </div>
 
         {/* Tarjeta Principal del Wizard */}
-        <div className="bg-white dark:bg-surface-100 rounded-2xl border border-stone-200 dark:border-surface-300 shadow-card dark:shadow-dark-card overflow-hidden">
+        <div className="bg-cream-50 dark:bg-surface-100 rounded-2xl border border-stone-200/90 dark:border-surface-300 shadow-card dark:shadow-dark-card overflow-hidden">
           <BookUploadWizard onSuccess={handleSuccess} />
         </div>
       </div>

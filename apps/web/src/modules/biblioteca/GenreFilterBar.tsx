@@ -32,8 +32,8 @@ export function GenreFilterBar({
             onClick={() => onSelectGenre(genre)}
             className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer ${
               isSelected
-                ? 'bg-stone-900 text-stone-50 dark:bg-stone-100 dark:text-stone-900 shadow-subtle'
-                : 'bg-white dark:bg-surface-100 text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-surface-300 hover:border-stone-400 dark:hover:border-surface-400 hover:text-stone-900 dark:hover:text-stone-100'
+                ? 'bg-stone-900 text-cream-50 dark:bg-cream-100 dark:text-stone-900 shadow-subtle'
+                : 'bg-cream-50 dark:bg-surface-100 text-stone-700 dark:text-stone-300 border border-stone-200/90 dark:border-surface-300 hover:border-terracotta-300 dark:hover:border-surface-400 hover:text-stone-900 dark:hover:text-stone-100'
             }`}
           >
             {genre}

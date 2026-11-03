@@ -15,9 +15,9 @@ export function BookCard({ book, onRead }: BookCardProps) {
   const hasCover = Boolean(book.coverUrl && !imageError);
 
   return (
-    <article className="bg-white dark:bg-surface-100 rounded-2xl border border-stone-200 dark:border-surface-300 overflow-hidden swiss-card flex flex-col group">
+    <article className="bg-cream-50 dark:bg-surface-100 rounded-2xl border border-stone-200/90 dark:border-surface-300 overflow-hidden swiss-card flex flex-col group">
       {/* Visual Header / Cover Canvas */}
-      <div className="h-52 bg-stone-100 dark:bg-surface-200 relative overflow-hidden border-b border-stone-200 dark:border-surface-300">
+      <div className="h-52 bg-cream-100 dark:bg-surface-200 relative overflow-hidden border-b border-stone-200/80 dark:border-surface-300">
         {hasCover ? (
           <>
             {/* Imagen de Portada de la Base de Datos */}
@@ -55,7 +55,7 @@ export function BookCard({ book, onRead }: BookCardProps) {
           /* Fallback sin imagen (diseño tipográfico clásico) */
           <div className="p-5 h-full flex flex-col justify-between">
             <div className="flex items-center justify-between z-10">
-              <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-white dark:bg-surface-100 border border-stone-200 dark:border-surface-300 text-[11px] font-semibold text-terracotta-600 dark:text-terracotta-400 tracking-wider uppercase">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-cream-50 dark:bg-surface-100 border border-stone-200 dark:border-surface-300 text-[11px] font-semibold text-terracotta-600 dark:text-terracotta-400 tracking-wider uppercase">
                 {primaryGenre}
               </span>
               <span className="text-[11px] font-mono text-stone-400 dark:text-stone-500">
@@ -87,14 +87,14 @@ export function BookCard({ book, onRead }: BookCardProps) {
           </p>
         </div>
 
-        <div className="pt-3 border-t border-stone-100 dark:border-surface-300 flex items-center justify-between">
+        <div className="pt-3 border-t border-stone-200/60 dark:border-surface-300 flex items-center justify-between">
           <span className="text-[11px] text-stone-400 dark:text-stone-500 font-mono">
             {book.publishedYear || 'S/F'}
           </span>
 
           <button
             onClick={() => onRead(book)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-stone-900 text-stone-50 dark:bg-stone-100 dark:text-stone-900 hover:bg-stone-800 dark:hover:bg-white text-xs font-medium transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-stone-900 text-cream-50 dark:bg-cream-100 dark:text-stone-900 hover:bg-stone-800 dark:hover:bg-cream-50 text-xs font-medium transition-colors cursor-pointer"
           >
             <BookOpen size={13} />
             Leer Libro
