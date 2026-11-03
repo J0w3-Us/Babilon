@@ -1,29 +1,30 @@
 'use client';
 
-import { BookGenre } from '@babilon/shared-types';
-
-export const GENRES_FILTER_LIST: (BookGenre | 'Todos')[] = [
-  'Todos',
-  'Ficción',
-  'Ciencia Ficción',
-  'Filosofía',
-  'Clásicos',
-  'Poesía',
-  'Historia',
-];
-
 interface GenreFilterBarProps {
   selectedGenre: string;
   onSelectGenre: (genre: string) => void;
+  genres?: string[];
 }
+
+export const DEFAULT_GENRES: string[] = [
+  'Todos',
+  'Clásicos',
+  'Ficción',
+  'Filosofía',
+  'Historia',
+  'Poesía',
+];
 
 export function GenreFilterBar({
   selectedGenre,
   onSelectGenre,
+  genres = DEFAULT_GENRES,
 }: GenreFilterBarProps) {
+  const displayGenres = genres && genres.length > 0 ? genres : DEFAULT_GENRES;
+
   return (
     <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-      {GENRES_FILTER_LIST.map((genre) => {
+      {displayGenres.map((genre) => {
         const isSelected = selectedGenre === genre;
         return (
           <button

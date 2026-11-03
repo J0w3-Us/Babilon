@@ -43,7 +43,7 @@ export function UploadView() {
         <div className="mb-7">
           <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-stone-100 dark:bg-surface-200 text-stone-700 dark:text-stone-300 text-[11px] font-semibold uppercase tracking-wider border border-stone-200 dark:border-surface-300 mb-2.5">
             <UploadCloud size={12} className="text-terracotta-600 dark:text-terracotta-500" />
-            <span>Pilar 3: Ingesta Literaria</span>
+            <span>Ingesta Literaria</span>
           </div>
           <h1 className="font-serif text-3xl sm:text-4xl font-bold text-stone-900 dark:text-stone-50 tracking-tight">
             Digitalizar y Subir Obra

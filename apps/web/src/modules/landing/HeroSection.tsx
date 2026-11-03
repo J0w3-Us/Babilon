@@ -103,7 +103,7 @@ export function HeroSection() {
                   Almacenamiento
                 </p>
                 <p className="font-serif text-2xl font-bold text-emerald-700 dark:text-emerald-400 mt-1">
-                  API de libros
+                  Mongose
                 </p>
                 <p className="text-[11px] text-stone-400 dark:text-stone-500 mt-0.5">Catálogo centralizado</p>
               </div>

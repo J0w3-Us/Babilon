@@ -13,6 +13,7 @@ export interface FetchBooksResult {
   total: number;
   storage: 'api' | 'memory-fallback' | 'fallback';
   online: boolean;
+  hasMore?: boolean;
 }
 
 async function apiFetch<T>(endpoint: string, options?: RequestInit): Promise<{ data: T | null; response: Response | null }> {
@@ -72,17 +73,26 @@ export async function getBooksApi(params?: {
   query?: string;
   genre?: string;
   featured?: boolean;
+  limit?: number;
+  skip?: number;
 }): Promise<FetchBooksResult> {
   const queryParams = new URLSearchParams();
   if (params?.query && params.query.trim()) {
+    queryParams.append('busqueda', params.query.trim());
     queryParams.append('query', params.query.trim());
   }
   if (params?.genre && params.genre !== 'Todos') {
     queryParams.append('genre', params.genre);
+    queryParams.append('categoria', params.genre);
   }
   if (params?.featured) {
     queryParams.append('featured', 'true');
   }
+
+  const limit = params?.limit ?? 20;
+  const skip = params?.skip ?? 0;
+  queryParams.append('limit', String(limit));
+  queryParams.append('skip', String(skip));
 
   const endpoint = `/api/backend/api/libros${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
   const { data } = await apiFetch<unknown>(endpoint);
@@ -92,9 +102,16 @@ export async function getBooksApi(params?: {
     const books = rawBooks
       .map((book) => normalizeBook(book))
       .filter((book) => matchesBookFilters(book, params));
+
+    const totalFromServer = isRecord(data) && typeof data.total === 'number' ? data.total : books.length;
+    const hasMoreFromServer = isRecord(data) && typeof data.hasMore === 'boolean'
+      ? data.hasMore
+      : (skip + books.length < totalFromServer);
+
     return {
       books,
-      total: books.length,
+      total: totalFromServer,
+      hasMore: hasMoreFromServer,
       storage: 'api',
       online: true,
     };
@@ -103,6 +120,7 @@ export async function getBooksApi(params?: {
   return {
     books: [],
     total: 0,
+    hasMore: false,
     storage: 'fallback',
     online: false,
   };

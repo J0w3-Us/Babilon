@@ -142,3 +142,4 @@ export function formatPagesToDocument(pages: Array<{ numero: number; texto: stri
     .map((p) => `${PAGE_SEPARATOR(p.numero)}\n\n${p.texto.trim()}`)
     .join('\n\n');
 }
+
