@@ -70,7 +70,7 @@ export function BookUploadWizard({
               : 'border-transparent text-stone-500 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-200'
           }`}
         >
-          <span>2. Ingesta & Markdown (MinerU)</span>
+          <span>2. Ingresa pdf / word / md</span>
           {fullText && (
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
           )}

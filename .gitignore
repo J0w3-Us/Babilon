@@ -10,3 +10,5 @@ coverage/
 
 *.log
 pnpm-debug.log*
+.vercel
+.env*

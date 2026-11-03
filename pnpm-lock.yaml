@@ -133,12 +133,18 @@ importers:
       '@babilon/shared-types':
         specifier: workspace:*
         version: link:../../packages/shared-types
+      '@types/pdf-parse':
+        specifier: ^1.1.5
+        version: 1.1.5
       lucide-react:
         specifier: ^0.378.0
         version: 0.378.0(react@18.3.1)
       next:
         specifier: ^14.2.3
         version: 14.2.35(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(sass@1.90.0)
+      pdf-parse:
+        specifier: ^2.4.5
+        version: 2.4.5
       react:
         specifier: ^18.3.1
         version: 18.3.1
