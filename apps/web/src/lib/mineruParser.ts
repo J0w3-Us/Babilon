@@ -8,9 +8,12 @@ export interface ParseMinerUInput {
 }
 
 const SKIP_PATTERNS = [
+  /^-{3,}\s*p[aá]gina\s*\d+\s*-{3,}$/i,            // "--- Página 1 ---"
   /^p[aá]gina\s*\d+$/i,                            // "Página 1", "Pagina 3"
   /^##\s*p[aá]gina\s*\d+$/i,                       // "## Página 1"
   /^#+\s*p[aá]gina\s*\d+/i,                        // "# Página 1", "### Página 2"
+  /^-{3,}$/,                                       // "---"
+  /^[*]{3,}$/,                                      // "***"
   /\b(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre|ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic)\b.{0,30}20\d\d/i, // fechas
   /20\d\d.{0,15}(ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic)/i,
   /^\d{1,2}\s+de\s+\w+\s+de\s+20\d\d/i,           // "29 de octubre de 2026"
@@ -18,12 +21,12 @@ const SKIP_PATTERNS = [
 ];
 
 function isSkippable(line: string): boolean {
-  const clean = line.replace(/^[#*_\s]+/, '').replace(/[#*_\s]+$/, '').trim();
-  return SKIP_PATTERNS.some((re) => re.test(clean));
+  const clean = line.replace(/^[#*_\-\s]+/, '').replace(/[#*_\-\s]+$/, '').trim();
+  return !clean || SKIP_PATTERNS.some((re) => re.test(line.trim()) || re.test(clean));
 }
 
 function cleanLine(line: string): string {
-  return line.replace(/^[#*_\s]+/, '').replace(/[#*_\s]+$/, '').trim();
+  return line.replace(/^[#*_\-\s]+/, '').replace(/[#*_\-\s]+$/, '').trim();
 }
 
 /**
