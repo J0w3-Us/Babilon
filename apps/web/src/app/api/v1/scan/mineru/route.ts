@@ -1,15 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { processMinerUOutput } from '@/lib/mineruParser';
-import { PDFParse } from 'pdf-parse';
 import { spawn } from 'child_process';
 import { promises as fs } from 'fs';
 import path from 'path';
 import os from 'os';
 
+// Polyfills para compatibilidad de pdfjs-dist en entornos serverless puros de Node.js (Vercel)
+if (typeof (globalThis as any).DOMMatrix === 'undefined') {
+  (globalThis as any).DOMMatrix = class DOMMatrix {};
+}
+if (typeof (globalThis as any).ImageData === 'undefined') {
+  (globalThis as any).ImageData = class ImageData {};
+}
+if (typeof (globalThis as any).Path2D === 'undefined') {
+  (globalThis as any).Path2D = class Path2D {};
+}
+
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 async function extractWithPdfParse(buffer: Buffer) {
+  // Import dinámico para asegurar que los polyfills ya existan en globalThis
+  const { PDFParse } = await import('pdf-parse');
   const parser = new PDFParse({ data: buffer });
   try {
     const textResult = await parser.getText();
