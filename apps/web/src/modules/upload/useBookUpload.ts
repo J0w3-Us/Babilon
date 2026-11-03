@@ -54,6 +54,8 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
             type: 'success',
             text: `¡PDF procesado exitosamente con MinerU! Markdown generado y listo para revisión.`,
           });
+          // Auto-switch a la pestaña de metadatos para que el usuario vea los campos auto-rellenados
+          setUploadTab('meta');
         } else {
           setStatusMessage({
             type: 'error',
@@ -88,6 +90,13 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
       }
     };
     reader.readAsText(file);
+  };
+
+  const clearFile = () => {
+    setUploadedFileName(null);
+    setFullText('');
+    setScanResult(null);
+    setStatusMessage(null);
   };
 
   const submitBook = async () => {
@@ -190,6 +199,7 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
       setFullText,
       handleFileUpload,
       submitBook,
+      clearFile,
     },
   };
 }

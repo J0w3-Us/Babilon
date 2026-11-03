@@ -128,6 +128,7 @@ export function BookUploadWizard({
             previewEstimatedPages={previewEstimatedPages}
             onFileSelect={actions.handleFileUpload}
             onTextChange={actions.setFullText}
+            onClearFile={actions.clearFile}
           />
         )}
 
