@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { Book } from '@babilon/shared-types';
-import { BookOpen } from 'lucide-react';
+import { BookmarkCheck, BookOpen } from 'lucide-react';
+import { useReadingProgress } from './hooks/useReadingProgress';
 
 interface BookCardProps {
   book: Book;
@@ -11,6 +12,7 @@ interface BookCardProps {
 
 export function BookCard({ book, onRead }: BookCardProps) {
   const [imageError, setImageError] = useState(false);
+  const { progress, progressPercent } = useReadingProgress(book.id);
   const primaryGenre = book.genres?.[0] || 'Clásicos';
   const hasCover = Boolean(book.coverUrl && !imageError);
 
@@ -85,6 +87,33 @@ export function BookCard({ book, onRead }: BookCardProps) {
           <p className="text-xs text-stone-500 dark:text-stone-400 mt-2 line-clamp-3 leading-relaxed">
             {book.synopsis || 'Sinopsis de archivo en catalogación.'}
           </p>
+          {progress && (
+            <div className="mt-3" aria-label={`Progreso de lectura de ${book.title}`}>
+              <div className="flex items-center gap-1.5 text-[11px] font-medium text-terracotta-700 dark:text-terracotta-300">
+                <BookmarkCheck size={13} aria-hidden="true" />
+                <span>
+                  En lectura · página {progress.pageNumber}
+                  {progress.totalPages > 0 ? ` de ${progress.totalPages}` : ''}
+                  {progressPercent !== null ? ` · ${progressPercent}%` : ''}
+                </span>
+              </div>
+              {progressPercent !== null && (
+                <div
+                  className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-stone-200 dark:bg-surface-300"
+                  role="progressbar"
+                  aria-label={`Progreso de lectura: ${progressPercent}%`}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={progressPercent}
+                >
+                  <div
+                    className="h-full rounded-full bg-terracotta-600 dark:bg-terracotta-400"
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="pt-3 border-t border-stone-200/60 dark:border-surface-300 flex items-center justify-between">
@@ -93,7 +122,9 @@ export function BookCard({ book, onRead }: BookCardProps) {
           </span>
 
           <button
+            type="button"
             onClick={() => onRead(book)}
+            aria-label={`Leer ${book.title}`}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-stone-900 text-cream-50 dark:bg-cream-100 dark:text-stone-900 hover:bg-stone-800 dark:hover:bg-cream-50 text-xs font-medium transition-colors cursor-pointer"
           >
             <BookOpen size={13} />

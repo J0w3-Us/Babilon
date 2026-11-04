@@ -2,6 +2,23 @@ import { Book, BookGenre, BookPage, BookChapter } from '@babilon/shared-types';
 
 const DEFAULT_COVER_URL = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=600&q=80';
 
+export function normalizeCoverUrl(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+
+  const coverUrl = value.trim();
+  if (!coverUrl) return undefined;
+
+  try {
+    const parsedUrl = new URL(coverUrl);
+    if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+      return undefined;
+    }
+    return parsedUrl.toString();
+  } catch {
+    return undefined;
+  }
+}
+
 export function normalizeBook(doc: Record<string, any>): Book {
   const authorValue = doc.autor ?? doc.author;
   const author = typeof authorValue === 'string'
@@ -80,7 +97,11 @@ export function normalizeBook(doc: Record<string, any>): Book {
       .join('\n\n');
   }
 
-  const coverUrl = doc.portada_url ?? doc.coverUrl ?? doc.portada ?? DEFAULT_COVER_URL;
+  const coverUrl =
+    normalizeCoverUrl(doc.portada_url) ??
+    normalizeCoverUrl(doc.coverUrl) ??
+    normalizeCoverUrl(doc.portada) ??
+    DEFAULT_COVER_URL;
 
   return {
     id: String(doc._id ?? doc.id ?? doc.isbn ?? Math.random().toString()),

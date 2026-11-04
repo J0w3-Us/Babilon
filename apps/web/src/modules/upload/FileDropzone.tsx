@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, useMemo, useCallback } from 'react';
+import { useRef, useState, useMemo, useCallback, useEffect } from 'react';
 import {
   UploadCloud,
   Loader2,
@@ -18,11 +18,15 @@ import {
   File,
 } from 'lucide-react';
 import { splitTextIntoPages, ParsedPage } from '@/lib/pageSplitter';
+import { StructuredBookDocument } from '@/lib/bookTextCleaner';
 
 interface FileDropzoneProps {
   isScanning: boolean;
   uploadedFileName: string | null;
   fullText: string;
+  structuredDocument: StructuredBookDocument | null;
+  title: string;
+  author: string;
   previewEstimatedPages: number;
   onFileSelect: (file: File) => void;
   onTextChange: (text: string) => void;
@@ -33,6 +37,9 @@ export function FileDropzone({
   isScanning,
   uploadedFileName,
   fullText,
+  structuredDocument,
+  title,
+  author,
   previewEstimatedPages,
   onFileSelect,
   onTextChange,
@@ -41,13 +48,19 @@ export function FileDropzone({
   const [viewMode, setViewMode] = useState<'preview' | 'editor'>('preview');
   const [pageLayout, setPageLayout] = useState<'carousel' | 'continuous'>('carousel');
   const [activePageIndex, setActivePageIndex] = useState<number>(0);
+  const [documentSection, setDocumentSection] = useState<'body' | 'cover' | 'extras'>('body');
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Parsear texto en páginas reales
+  useEffect(() => {
+    setDocumentSection('body');
+    setActivePageIndex(0);
+  }, [structuredDocument]);
+
+  const bodyText = structuredDocument?.body ?? fullText;
   const parsedPages: ParsedPage[] = useMemo(() => {
-    return splitTextIntoPages(fullText);
-  }, [fullText]);
+    return splitTextIntoPages(bodyText);
+  }, [bodyText]);
 
   // Si cambia la cantidad de páginas y el índice queda fuera de rango, ajustarlo
   const safePageIndex = Math.min(activePageIndex, Math.max(0, parsedPages.length - 1));
@@ -105,10 +118,10 @@ export function FileDropzone({
             </div>
           </div>
           <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">
-            Escaneando documento y separando páginas…
+            El servicio externo está procesando el documento…
           </p>
           <p className="text-xs text-amber-700/80 dark:text-amber-400/70 mt-1.5">
-            Preservando estructura de hojas, texto y encabezados
+            Al terminar podrás revisar el texto y los metadatos detectados
           </p>
         </div>
       ) : uploadedFileName ? (
@@ -214,6 +227,52 @@ export function FileDropzone({
       )}
 
       {/* ── Encabezado de la Sección de Visualización de Páginas ── */}
+      {structuredDocument && (
+        <div
+          className="flex flex-wrap gap-2"
+          role="group"
+          aria-label="Secciones del documento procesado"
+        >
+          <button
+            type="button"
+            aria-pressed={documentSection === 'body'}
+            onClick={() => setDocumentSection('body')}
+            className={`min-h-10 rounded-lg px-3 text-xs font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-terracotta-600 ${
+              documentSection === 'body'
+                ? 'bg-stone-900 text-cream-50 dark:bg-cream-100 dark:text-stone-900'
+                : 'border border-stone-200 text-stone-600 dark:border-surface-300 dark:text-stone-300'
+            }`}
+          >
+            Cuerpo · {parsedPages.length} págs.
+          </button>
+          <button
+            type="button"
+            aria-pressed={documentSection === 'cover'}
+            onClick={() => setDocumentSection('cover')}
+            className={`min-h-10 rounded-lg px-3 text-xs font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-terracotta-600 ${
+              documentSection === 'cover'
+                ? 'bg-stone-900 text-cream-50 dark:bg-cream-100 dark:text-stone-900'
+                : 'border border-stone-200 text-stone-600 dark:border-surface-300 dark:text-stone-300'
+            }`}
+          >
+            Portada
+          </button>
+          <button
+            type="button"
+            aria-pressed={documentSection === 'extras'}
+            onClick={() => setDocumentSection('extras')}
+            className={`min-h-10 rounded-lg px-3 text-xs font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-terracotta-600 ${
+              documentSection === 'extras'
+                ? 'bg-stone-900 text-cream-50 dark:bg-cream-100 dark:text-stone-900'
+                : 'border border-stone-200 text-stone-600 dark:border-surface-300 dark:text-stone-300'
+            }`}
+          >
+            Material extra · {structuredDocument.extras.length}
+          </button>
+        </div>
+      )}
+
+      <div hidden={documentSection !== 'body'}>
       <div>
         <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
           <div className="flex items-center gap-2.5">
@@ -397,6 +456,65 @@ export function FileDropzone({
           </div>
         )}
       </div>
+      </div>
+
+      {documentSection === 'cover' && structuredDocument && (
+        <section
+          className="rounded-2xl border border-stone-200 bg-cream-50 p-6 dark:border-surface-300 dark:bg-surface-100"
+          aria-labelledby="book-cover-preview-title"
+        >
+          <p className="text-[11px] font-mono uppercase tracking-widest text-terracotta-700 dark:text-terracotta-300">
+            Presentación
+          </p>
+          <h3
+            id="book-cover-preview-title"
+            className="mt-2 font-serif text-2xl font-bold text-stone-900 dark:text-stone-100"
+          >
+            {title || structuredDocument.cover.title || 'Portada de la obra'}
+          </h3>
+          {(author || structuredDocument.cover.author) && (
+            <p className="mt-1 text-sm text-stone-600 dark:text-stone-300">
+              {author || structuredDocument.cover.author}
+            </p>
+          )}
+          {structuredDocument.cover.text ? (
+            <p className="mt-5 max-w-prose whitespace-pre-line font-serif leading-relaxed text-stone-700 dark:text-stone-300">
+              {structuredDocument.cover.text}
+            </p>
+          ) : (
+            <p className="mt-5 text-xs text-stone-500 dark:text-stone-400">
+              La API no devolvió texto preliminar para la portada. El título y el autor editables se muestran arriba.
+            </p>
+          )}
+        </section>
+      )}
+
+      {documentSection === 'extras' && structuredDocument && (
+        <section
+          className="space-y-4"
+          aria-label="Material extra y preliminares"
+        >
+          {structuredDocument.extras.length > 0 ? (
+            structuredDocument.extras.map((section, index) => (
+              <article
+                key={`${section.title}-${index}`}
+                className="rounded-xl border border-stone-200 bg-cream-50 p-5 dark:border-surface-300 dark:bg-surface-100"
+              >
+                <h3 className="font-serif text-lg font-bold text-stone-900 dark:text-stone-100">
+                  {section.title}
+                </h3>
+                <p className="mt-3 whitespace-pre-line font-serif leading-relaxed text-stone-700 dark:text-stone-300">
+                  {section.content}
+                </p>
+              </article>
+            ))
+          ) : (
+            <p className="rounded-xl border border-dashed border-stone-300 px-5 py-8 text-center text-sm text-stone-500 dark:border-surface-300 dark:text-stone-400">
+              No se detectaron anexos ni preliminares en el documento.
+            </p>
+          )}
+        </section>
+      )}
     </div>
   );
 }

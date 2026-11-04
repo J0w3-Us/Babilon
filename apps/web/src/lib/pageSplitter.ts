@@ -10,6 +10,7 @@ export interface ParsedPage {
 }
 
 export const PAGE_SEPARATOR = (pageNum: number) => `--- Página ${pageNum} ---`;
+const MAX_PAGE_CHARACTERS = 3500;
 
 /**
  * Divide un texto continuo o con separadores en un array de páginas limpias y legibles.
@@ -33,11 +34,8 @@ export function splitTextIntoPages(fullText: string): ParsedPage[] {
     const pages = rawParts
       .map((p) => cleanPageContent(p))
       .filter((p) => p.length > 0)
-      .map((texto, idx) => ({
-        numero: idx + 1,
-        texto,
-        conteo_palabras: countWords(texto),
-      }));
+      .flatMap(splitLongPage)
+      .map((texto, idx) => ({ numero: idx + 1, texto, conteo_palabras: countWords(texto) }));
 
     if (pages.length > 0) return pages;
   }
@@ -49,11 +47,8 @@ export function splitTextIntoPages(fullText: string): ParsedPage[] {
     const pages = rawParts
       .map((p) => cleanPageContent(p))
       .filter((p) => p.length > 0)
-      .map((texto, idx) => ({
-        numero: idx + 1,
-        texto,
-        conteo_palabras: countWords(texto),
-      }));
+      .flatMap(splitLongPage)
+      .map((texto, idx) => ({ numero: idx + 1, texto, conteo_palabras: countWords(texto) }));
 
     if (pages.length > 0) return pages;
   }
@@ -65,11 +60,8 @@ export function splitTextIntoPages(fullText: string): ParsedPage[] {
     const pages = rawParts
       .map((p) => cleanPageContent(p))
       .filter((p) => p.length > 0)
-      .map((texto, idx) => ({
-        numero: idx + 1,
-        texto,
-        conteo_palabras: countWords(texto),
-      }));
+      .flatMap(splitLongPage)
+      .map((texto, idx) => ({ numero: idx + 1, texto, conteo_palabras: countWords(texto) }));
 
     if (pages.length > 0) return pages;
   }
@@ -77,35 +69,61 @@ export function splitTextIntoPages(fullText: string): ParsedPage[] {
   // 4. Si es un texto largo continuo sin marcas (> 1800 caracteres), dividir naturalmente por párrafos
   if (trimmed.length > 2000) {
     const paragraphs = trimmed.split(/\n\s*\n/);
-    const generatedPages: ParsedPage[] = [];
+    const generatedPages: string[] = [];
     let currentChunk = '';
-    let pageCounter = 1;
 
     for (const paragraph of paragraphs) {
       const p = paragraph.trim();
       if (!p) continue;
 
-      if ((currentChunk.length + p.length) > 1800 && currentChunk.length > 500) {
-        generatedPages.push({
-          numero: pageCounter++,
-          texto: currentChunk.trim(),
-          conteo_palabras: countWords(currentChunk),
-        });
+      if (p.length > MAX_PAGE_CHARACTERS) {
+        if (currentChunk) generatedPages.push(currentChunk.trim());
+        generatedPages.push(...splitLongPage(p));
+        currentChunk = '';
+        continue;
+      }
+
+      const combined = currentChunk ? `${currentChunk}\n\n${p}` : p;
+      if (combined.length > 1800 && currentChunk.length > 0) {
+        generatedPages.push(currentChunk.trim());
         currentChunk = p;
       } else {
-        currentChunk += (currentChunk ? '\n\n' : '') + p;
+        currentChunk = combined;
       }
     }
 
-    if (currentChunk.trim()) {
-      generatedPages.push({
-        numero: pageCounter,
-        texto: currentChunk.trim(),
-        conteo_palabras: countWords(currentChunk),
-      });
+    if (currentChunk.trim()) generatedPages.push(currentChunk.trim());
+
+    if (generatedPages.length > 0) {
+      return generatedPages.map((texto, idx) => ({
+        numero: idx + 1,
+        texto,
+        conteo_palabras: countWords(texto),
+      }));
+    }
+  }
+
+  function splitLongPage(text: string): string[] {
+    const characters = Array.from(text);
+    const chunks: string[] = [];
+    let start = 0;
+
+    while (characters.length - start > MAX_PAGE_CHARACTERS) {
+      let end = start + MAX_PAGE_CHARACTERS;
+      const preferredMinimum = start + Math.floor(MAX_PAGE_CHARACTERS * 0.75);
+      for (let index = end - 1; index >= preferredMinimum; index -= 1) {
+        if (/\s/.test(characters[index])) {
+          end = index + 1;
+          break;
+        }
+      }
+      chunks.push(characters.slice(start, end).join('').trim());
+      start = end;
     }
 
-    if (generatedPages.length > 0) return generatedPages;
+    const remainder = characters.slice(start).join('').trim();
+    if (remainder) chunks.push(remainder);
+    return chunks;
   }
 
   // 5. Fallback: una sola página
@@ -142,4 +160,3 @@ export function formatPagesToDocument(pages: Array<{ numero: number; texto: stri
     .map((p) => `${PAGE_SEPARATOR(p.numero)}\n\n${p.texto.trim()}`)
     .join('\n\n');
 }
-

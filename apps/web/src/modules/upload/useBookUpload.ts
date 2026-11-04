@@ -1,24 +1,49 @@
-import { useState, useMemo } from 'react';
-import { BookGenre, MinerUScanResult } from '@babilon/shared-types';
-import { createBookApi } from '@/services/api';
+import { useState, useMemo, useEffect } from 'react';
+import { Book, BookGenre, MinerUScanResult } from '@babilon/shared-types';
+import { createBookApi, uploadBookPagesApi } from '@/services/api';
 import { mineruScannerService } from '@/services/mineru.service';
-import { splitTextIntoPages, formatPagesToDocument } from '@/lib/pageSplitter';
+import { splitTextIntoPages } from '@/lib/pageSplitter';
+import {
+  formatBookDocumentForUpload,
+} from '@/lib/bookTextCleaner';
+import type { StructuredBookDocument } from '@/lib/bookTextCleaner';
+import { cleanAndStructureBookDocumentAsync } from '@/lib/bookTextCleanerAsync';
+import { GENRES_LIST } from './bookUploadOptions';
 
 export interface UseBookUploadOptions {
   onSuccess?: () => void;
 }
 
+const PAGE_UPLOAD_BATCH_SIZE = 50;
+type MinerUScanWithBookDraft = MinerUScanResult & {
+  suggestedBookDraft?: Partial<Book>;
+  coverUrl?: string;
+};
+
+function isHttpCoverUrl(value: string): boolean {
+  try {
+    const protocol = new URL(value).protocol;
+    return protocol === 'http:' || protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
-  const [uploadTab, setUploadTab] = useState<'meta' | 'content'>('meta');
+  const [uploadTab, setUploadTab] = useState<'meta' | 'content'>('content');
   const [title, setTitle] = useState('');
   const [author, setAuthor] = useState('');
   const [isbn, setIsbn] = useState('');
-  const [genre, setGenre] = useState<BookGenre>('Ficción');
-  const [year, setYear] = useState<number>(new Date().getFullYear());
+  const [genre, setGenre] = useState<BookGenre | ''>('');
+  const [year, setYear] = useState<number | ''>('');
   const [publisher, setPublisher] = useState('Editorial Babilon');
   const [synopsis, setSynopsis] = useState('');
   const [coverUrl, setCoverUrl] = useState('');
+  const [extractedCoverPreviewUrl, setExtractedCoverPreviewUrl] = useState('');
+  const [customCoverFile, setCustomCoverFile] = useState<File | null>(null);
+  const [customCoverPreviewUrl, setCustomCoverPreviewUrl] = useState('');
   const [fullText, setFullText] = useState('');
+  const [cleanedDocument, setCleanedDocument] = useState<StructuredBookDocument | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [scanResult, setScanResult] = useState<MinerUScanResult | null>(null);
@@ -28,45 +53,125 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
     text: string;
   } | null>(null);
 
+  useEffect(() => {
+    if (!customCoverFile) {
+      setCustomCoverPreviewUrl('');
+      return;
+    }
+
+    const previewUrl = URL.createObjectURL(customCoverFile);
+    setCustomCoverPreviewUrl(previewUrl);
+    return () => URL.revokeObjectURL(previewUrl);
+  }, [customCoverFile]);
+
   const handleFileUpload = async (file: File) => {
-    setUploadedFileName(file.name);
     const isPdf = file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf';
+    const isTextFile = /\.(txt|md)$/i.test(file.name) || file.type === 'text/plain';
+
+    if (!isPdf && !isTextFile) {
+      setStatusMessage({
+        type: 'error',
+        text: 'Formato no compatible. Selecciona un PDF, TXT o MD.',
+      });
+      return;
+    }
+
+    setUploadedFileName(file.name);
+    setFullText('');
+    setCleanedDocument(null);
+    setScanResult(null);
+    setExtractedCoverPreviewUrl('');
 
     if (isPdf) {
       setIsScanning(true);
       setStatusMessage({
         type: 'info',
-        text: 'Escaneando PDF con MinerU Engine: extrayendo Markdown y metadatos...',
+        text: 'Procesando el PDF con el servicio externo de digitalización...',
       });
 
       try {
         const result = await mineruScannerService.scan(file);
-        if (result.success && result.data) {
+        if (result.success && result.data?.success !== false && result.data) {
           const scan = result.data;
-          setScanResult(scan);
-          setFullText(scan.rawMarkdown || '');
+          const scanWithBookDraft = scan as MinerUScanWithBookDraft;
+          const draft = scanWithBookDraft.suggestedBookDraft;
+          const extractedMetadata = scan.metadata;
+          const detectedTitle = scan.suggestedTitle || draft?.title || extractedMetadata?.title;
+          const detectedAuthor = scan.suggestedAuthor || draft?.author?.name || extractedMetadata?.author;
+          const detectedIsbn = scan.suggestedIsbn || draft?.isbn || extractedMetadata?.isbn;
+          const detectedSynopsis = scan.suggestedSynopsis || draft?.synopsis || extractedMetadata?.synopsis;
+          const detectedGenre = draft?.genres?.[0] || extractedMetadata?.genres?.[0];
+          const detectedYear = draft?.publishedYear ?? extractedMetadata?.publishedYear;
+          const detectedCover = draft?.coverUrl || scanWithBookDraft.coverUrl;
+          const sourceMarkdown = scan.pages?.length
+            ? [...scan.pages]
+                .sort((left, right) => left.pageNumber - right.pageNumber)
+                .map((page) => `--- Página ${page.pageNumber} ---\n${page.markdown}`)
+                .join('\n\n')
+            : scan.rawMarkdown || '';
+          const documentTitle = title.trim() || detectedTitle || '';
+          const documentAuthor = author.trim() || detectedAuthor || '';
 
-          if (!title && scan.suggestedTitle) setTitle(scan.suggestedTitle);
-          if (!author && scan.suggestedAuthor) setAuthor(scan.suggestedAuthor);
-          if (!isbn && scan.suggestedIsbn) setIsbn(scan.suggestedIsbn);
-          if (!synopsis && scan.suggestedSynopsis) setSynopsis(scan.suggestedSynopsis);
+          setStatusMessage({
+            type: 'info',
+            text: 'PDF recibido. Limpiando texto y separando capítulos del material extra...',
+          });
+          const cleanedResult = await cleanAndStructureBookDocumentAsync(
+            sourceMarkdown,
+            { title: documentTitle, author: documentAuthor }
+          );
+
+          setScanResult({ ...scan, rawMarkdown: cleanedResult.cleanedMarkdown });
+          setCleanedDocument(cleanedResult.structure);
+          setFullText(formatBookDocumentForUpload(cleanedResult.structure));
+
+          if (detectedTitle) setTitle((current) => current.trim() || detectedTitle);
+          if (detectedAuthor) setAuthor((current) => current.trim() || detectedAuthor);
+          if (detectedIsbn) setIsbn((current) => current.trim() || detectedIsbn);
+          if (detectedSynopsis) setSynopsis((current) => current.trim() || detectedSynopsis);
+          if (detectedGenre && GENRES_LIST.includes(detectedGenre)) {
+            setGenre((current) => current || detectedGenre);
+          }
+          if (typeof detectedYear === 'number' && Number.isInteger(detectedYear)) {
+            setYear((current) => current === '' ? detectedYear : current);
+          }
+          if (detectedCover?.startsWith('data:image/')) {
+            setExtractedCoverPreviewUrl(detectedCover);
+          } else if (detectedCover && isHttpCoverUrl(detectedCover)) {
+            setCoverUrl((current) => current.trim() || detectedCover);
+          }
+          const detectedPublisher = draft?.publisher;
+          if (detectedPublisher) {
+            setPublisher((current) =>
+              current === 'Editorial Babilon' ? detectedPublisher : current
+            );
+          }
 
           setStatusMessage({
             type: 'success',
-            text: `¡PDF procesado exitosamente con MinerU! Markdown generado y listo para revisión.`,
+            text: cleanedResult.structure.body
+              ? 'Texto limpio y estructurado. Revisa el cuerpo y el material extra antes de guardar.'
+              : 'No se detectó cuerpo principal. Revisa el archivo antes de guardarlo.',
           });
-          // Auto-switch a la pestaña de metadatos para que el usuario vea los campos auto-rellenados
           setUploadTab('meta');
         } else {
+          setUploadedFileName(null);
+          setCleanedDocument(null);
+          setFullText('');
           setStatusMessage({
             type: 'error',
-            text: result.message || 'No se pudo completar el análisis del PDF con MinerU.',
+            text: result.message || 'El servicio externo no pudo procesar el PDF.',
           });
         }
-      } catch {
+      } catch (error: unknown) {
+        setUploadedFileName(null);
+        setCleanedDocument(null);
+        setFullText('');
         setStatusMessage({
           type: 'error',
-          text: 'Fallo inesperado al conectar con el motor de escaneo MinerU.',
+          text: error instanceof Error
+            ? `No se pudo procesar el PDF: ${error.message}`
+            : 'No se pudo procesar el PDF con el servicio externo.',
         });
       } finally {
         setIsScanning(false);
@@ -74,43 +179,114 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
       return;
     }
 
-    // Archivos de texto plano (.txt, .md)
-    if (!title) {
-      const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
-      setTitle(cleanName);
-    }
-
     const reader = new FileReader();
-    reader.onload = (event) => {
-      const text = event.target?.result as string;
-      if (text) {
-        // Dividir y estructurar en páginas reales
-        const parsedPages = splitTextIntoPages(text);
-        const formattedDoc = formatPagesToDocument(parsedPages);
-        setFullText(formattedDoc);
+    reader.onload = async (event) => {
+      const text = event.target?.result;
+      if (typeof text === 'string' && text.trim()) {
+        const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+        const documentTitle = title.trim() || cleanName;
+        const documentAuthor = author.trim();
+        setIsScanning(true);
+        setStatusMessage({
+          type: 'info',
+          text: 'Limpiando texto y separando el cuerpo del material extra...',
+        });
 
-        if (!synopsis && parsedPages.length > 0) {
-          const firstPageClean = parsedPages[0].texto.slice(0, 260).trim();
-          setSynopsis(firstPageClean + (firstPageClean.length >= 260 ? '...' : ''));
+        try {
+          const cleanedResult = await cleanAndStructureBookDocumentAsync(text, {
+            title: documentTitle,
+            author: documentAuthor,
+          });
+          const bodyPages = splitTextIntoPages(cleanedResult.structure.body);
+          setTitle((current) => current.trim() || cleanName);
+          setCleanedDocument(cleanedResult.structure);
+          setFullText(formatBookDocumentForUpload(cleanedResult.structure));
+          if (!synopsis && bodyPages.length > 0) {
+            const firstPageClean = bodyPages[0].texto.slice(0, 260).trim();
+            setSynopsis(firstPageClean + (firstPageClean.length >= 260 ? '...' : ''));
+          }
+          setStatusMessage({
+            type: 'success',
+            text: cleanedResult.structure.body
+              ? 'Texto limpio y organizado para su revisión.'
+              : 'No se detectó cuerpo principal. Revisa el archivo antes de guardarlo.',
+          });
+          setUploadTab('meta');
+        } catch (error: unknown) {
+          setUploadedFileName(null);
+          setCleanedDocument(null);
+          setFullText('');
+          setStatusMessage({
+            type: 'error',
+            text: error instanceof Error
+              ? `No se pudo limpiar el documento: ${error.message}`
+              : 'No se pudo limpiar el documento.',
+          });
+        } finally {
+          setIsScanning(false);
         }
+      } else {
+        setUploadedFileName(null);
+        setStatusMessage({
+          type: 'error',
+          text: 'El archivo no contiene texto legible.',
+        });
       }
     };
+    reader.onerror = () => {
+      setUploadedFileName(null);
+      setStatusMessage({
+        type: 'error',
+        text: 'No se pudo leer el archivo seleccionado.',
+      });
+    };
     reader.readAsText(file);
+  };
+
+  const selectCustomCover = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      setStatusMessage({ type: 'error', text: 'Selecciona un archivo de imagen válido.' });
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setStatusMessage({ type: 'error', text: 'La imagen de portada debe pesar menos de 5 MB.' });
+      return;
+    }
+
+    setCustomCoverFile(file);
+    setStatusMessage(null);
   };
 
   const clearFile = () => {
     setUploadedFileName(null);
     setFullText('');
+    setCleanedDocument(null);
     setScanResult(null);
+    setExtractedCoverPreviewUrl('');
     setStatusMessage(null);
   };
 
+  const handleTextChange = (text: string) => {
+    setFullText(text);
+    setCleanedDocument(null);
+  };
+
   const submitBook = async () => {
-    if (!title.trim() || !author.trim()) {
+    const currentYear = new Date().getFullYear();
+    if (
+      !title.trim() ||
+      !author.trim() ||
+      !genre ||
+      year === '' ||
+      !Number.isInteger(year) ||
+      year < -3000 ||
+      year > currentYear + 2
+    ) {
       setStatusMessage({
         type: 'error',
-        text: 'Por favor completa al menos el título y el autor de la obra.',
+        text: 'Completa título, autor, género y año con valores válidos.',
       });
+      setUploadTab('meta');
       return;
     }
 
@@ -119,55 +295,93 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
 
     try {
       // Convertir el texto en páginas estructuradas limpias para MongoDB
-      let paginas = undefined;
-      let sampleChapterText: string | undefined = undefined;
-
-      if (fullText.trim()) {
-        const parsedPages = splitTextIntoPages(fullText);
-        paginas = parsedPages.map((p) => ({
-          numero: p.numero,
-          texto: p.texto,
-          conteo_palabras: p.conteo_palabras,
-        }));
-
-        // Preparar muestra para vista rápida
-        sampleChapterText = formatPagesToDocument(parsedPages.slice(0, 3));
+      let uploadText = fullText;
+      let documentForUpload = cleanedDocument;
+      if (fullText.trim() && !cleanedDocument) {
+        const cleanedResult = await cleanAndStructureBookDocumentAsync(fullText, {
+          title: title.trim(),
+          author: author.trim(),
+        });
+        documentForUpload = cleanedResult.structure;
+        setCleanedDocument(cleanedResult.structure);
+        uploadText = formatBookDocumentForUpload(cleanedResult.structure);
+        setFullText(uploadText);
       }
+
+      const bodyText = documentForUpload?.body ?? uploadText;
+      if (fullText.trim() && !bodyText.trim()) {
+        setStatusMessage({
+          type: 'error',
+          text: 'No se identificó un cuerpo principal para la obra. Revisa el documento antes de guardarlo.',
+        });
+        return;
+      }
+
+      const paginas = uploadText.trim()
+        ? splitTextIntoPages(uploadText).map((page) => ({
+            numero: page.numero,
+            texto: page.texto,
+            conteo_palabras: page.conteo_palabras,
+          }))
+        : [];
 
       const isbnVal = isbn.trim() || `ISBN-BAB-${Date.now().toString().slice(-6)}`;
 
-      const res = await createBookApi({
+      const savedBook = await createBookApi({
         title: title.trim(),
         isbn: isbnVal,
         author: { name: author.trim() },
         genres: [genre],
-        publishedYear: Number(year) || new Date().getFullYear(),
+        publishedYear: year,
         publisher: publisher.trim() || 'Editorial Babilon',
         synopsis: synopsis.trim() || 'Sin sinopsis registrada.',
+        pageCount: paginas.length,
         coverUrl: coverUrl.trim() || undefined,
-        sampleChapterText,
-        fullText: fullText.trim() || undefined,
-        paginas,
       });
 
-      if (res.success) {
-        setStatusMessage({
-          type: 'success',
-          text: '¡Obra y texto preservados exitosamente en el catálogo!',
-        });
-        if (onSuccess) {
-          setTimeout(onSuccess, 800);
-        }
-      } else {
+      if (!savedBook.success || !savedBook.bookId) {
         setStatusMessage({
           type: 'error',
-          text: res.message || 'Error al incorporar la obra en la biblioteca.',
+          text: savedBook.message || 'No se pudo guardar la obra en el catálogo.',
         });
+        return;
       }
-    } catch {
+
+      const pagesToUpload = paginas;
+      for (let offset = 0; offset < pagesToUpload.length; offset += PAGE_UPLOAD_BATCH_SIZE) {
+        const batch = pagesToUpload.slice(offset, offset + PAGE_UPLOAD_BATCH_SIZE);
+        const isFinalBatch = offset + batch.length === pagesToUpload.length;
+        setStatusMessage({
+          type: 'info',
+          text: `Guardando páginas ${offset + 1}–${offset + batch.length} de ${pagesToUpload.length}...`,
+        });
+
+        const batchResult = await uploadBookPagesApi(
+          savedBook.bookId,
+          batch,
+          isFinalBatch,
+          pagesToUpload.length
+        );
+        if (!batchResult.success) {
+          setStatusMessage({
+            type: 'error',
+            text: batchResult.message || 'La obra quedó pendiente de completar su contenido.',
+          });
+          return;
+        }
+      }
+
+      setStatusMessage({
+        type: 'success',
+        text: '¡Obra y páginas preservadas exitosamente en el catálogo!',
+      });
+      if (onSuccess) setTimeout(onSuccess, 800);
+    } catch (error: unknown) {
       setStatusMessage({
         type: 'error',
-        text: 'Error al conectar con la API de libros de Babilon.',
+        text: error instanceof Error
+          ? error.message
+          : 'Ocurrió un error inesperado al guardar el libro.',
       });
     } finally {
       setIsSubmitting(false);
@@ -175,10 +389,11 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
   };
 
   const previewEstimatedPages = useMemo(() => {
-    if (!fullText.trim()) return 0;
-    const pages = splitTextIntoPages(fullText);
+    const previewText = cleanedDocument?.body ?? fullText;
+    if (!previewText.trim()) return 0;
+    const pages = splitTextIntoPages(previewText);
     return pages.length;
-  }, [fullText]);
+  }, [cleanedDocument, fullText]);
 
   return {
     state: {
@@ -191,7 +406,10 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
       publisher,
       synopsis,
       coverUrl,
+      coverPreviewUrl: customCoverPreviewUrl || coverUrl || extractedCoverPreviewUrl,
+      hasCustomCover: customCoverFile !== null,
       fullText,
+      cleanedDocument,
       isSubmitting,
       isScanning,
       scanResult,
@@ -209,7 +427,9 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
       setPublisher,
       setSynopsis,
       setCoverUrl,
-      setFullText,
+      selectCustomCover,
+      removeCustomCover: () => setCustomCoverFile(null),
+      setFullText: handleTextChange,
       handleFileUpload,
       submitBook,
       clearFile,

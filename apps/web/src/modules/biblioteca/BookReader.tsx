@@ -1,8 +1,7 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import { Book, BookPage } from '@babilon/shared-types';
-import { splitTextIntoPages } from '@/lib/pageSplitter';
 import {
   BookOpen,
   X,
@@ -17,24 +16,40 @@ import {
 
 interface BookReaderProps {
   book: Book;
+  page: BookPage | null;
+  pageCount: number;
+  pageLoadError: string | null;
+  onRetryPage: () => void;
   onClose: () => void;
   currentPage: number;
   onPageChange: (page: number) => void;
+  savedPageNumber: number | null;
+  readingProgressPercent: number | null;
+  onResumeReading: () => void;
+  readingProgressError: string | null;
   theme: 'parchment' | 'dark' | 'light';
   onThemeChange: (theme: 'parchment' | 'dark' | 'light') => void;
   fontSize: number;
   onFontSizeChange: (updater: (prev: number) => number) => void;
   isFullscreen: boolean;
   onToggleFullscreen: () => void;
-  /** true mientras se hace fetch del detalle completo con páginas */
+  /** true mientras se carga el bloque de páginas actual */
   isLoadingPages?: boolean;
 }
 
 export function BookReader({
   book,
+  page,
+  pageCount,
+  pageLoadError,
+  onRetryPage,
   onClose,
   currentPage,
   onPageChange,
+  savedPageNumber,
+  readingProgressPercent,
+  onResumeReading,
+  readingProgressError,
   theme,
   onThemeChange,
   fontSize,
@@ -43,53 +58,19 @@ export function BookReader({
   onToggleFullscreen,
   isLoadingPages = false,
 }: BookReaderProps) {
-  // Páginas preparadas para el Lector.
-  // Prioridad: 1) book.pages con texto real → 2) sampleChapterText parseado → 3) synopsis / fallback
-  const readerPages: BookPage[] = useMemo(() => {
-    if (!book) return [];
+  const readerScrollRef = useRef<HTMLDivElement>(null);
 
-    // 1. Array de páginas estructuradas con contenido real
-    if (book.pages && book.pages.length > 0) {
-      const pagesWithContent = book.pages.filter((p) => p.texto && p.texto.trim().length > 0);
-      if (pagesWithContent.length > 0) {
-        // Limpiar cualquier encabezado residual para que el lector muestre la página limpia
-        return pagesWithContent.map((p, idx) => ({
-          ...p,
-          numero: p.numero || idx + 1,
-          texto: p.texto
-            .replace(/^\s*#{1,3}\s*P[aá]gina\s*\d+\s*\n*/i, '')
-            .replace(/^\s*---\s*P[aá]gina\s*\d+\s*---\s*\n*/i, '')
-            .trim(),
-        }));
-      }
+  useLayoutEffect(() => {
+    if (readerScrollRef.current) {
+      readerScrollRef.current.scrollTop = 0;
     }
+  }, [currentPage]);
 
-    // 2. Texto de muestra o continuo: procesar con splitTextIntoPages
-    if (book.sampleChapterText && book.sampleChapterText.trim().length > 0) {
-      const parsed = splitTextIntoPages(book.sampleChapterText);
-      if (parsed.length > 0) {
-        return parsed.map((p) => ({
-          numero: p.numero,
-          texto: p.texto,
-          conteo_palabras: p.conteo_palabras,
-        }));
-      }
-    }
-
-    // 3. Fallback: mostrar sinopsis o mensaje de digitalización pendiente
-    return [
-      {
-        numero: 1,
-        texto: book.synopsis?.trim()
-          ? `${book.synopsis}\n\n— Esta obra aún no tiene su texto completo digitalizado en el catálogo de Babilon.`
-          : 'Texto en proceso de digitalización para esta obra de archivo.',
-      },
-    ];
-  }, [book]);
-
-  const currentPageData = readerPages[currentPage] || {
-    numero: 1,
-    texto: 'Página no disponible',
+  const currentPageData: BookPage = page ?? {
+    numero: currentPage + 1,
+    texto: book.synopsis?.trim()
+      ? `${book.synopsis}\n\n— Esta obra aún no tiene su texto digitalizado en el catálogo de Babilon.`
+      : 'Texto en proceso de digitalización para esta obra.',
   };
 
   return (
@@ -219,11 +200,14 @@ export function BookReader({
         </div>
 
         {/* Reader Canvas / Document Scroll */}
-        <div className="flex-1 overflow-y-auto px-6 sm:px-16 py-8 sm:py-12 select-text font-serif">
+        <div
+          ref={readerScrollRef}
+          className="flex-1 overflow-y-auto px-6 sm:px-16 py-8 sm:py-12 select-text font-serif"
+        >
           <div className="max-w-2xl mx-auto space-y-6">
             <div className="flex items-center justify-between border-b border-stone-200 dark:border-surface-300 pb-3 mb-6">
               <span className="text-[11px] font-mono uppercase tracking-widest opacity-60">
-                Página {currentPage + 1} de {readerPages.length}
+                {pageCount > 0 ? `Página ${currentPage + 1} de ${pageCount}` : 'Sin páginas digitalizadas'}
               </span>
               {currentPageData.nombre_archivo && (
                 <span className="text-[11px] font-mono opacity-50 truncate max-w-[200px]">
@@ -232,26 +216,58 @@ export function BookReader({
               )}
             </div>
 
+            {savedPageNumber !== null && savedPageNumber > 1 && currentPage === 0 && (
+              <div
+                className="sticky top-2 z-10 -mt-2 mb-5 flex items-center justify-between gap-3 rounded-xl border border-stone-200 bg-cream-50/95 px-3.5 py-2.5 text-xs shadow-sm dark:border-surface-300 dark:bg-surface-100/95"
+                role="status"
+                aria-live="polite"
+              >
+                <span className="text-stone-700 dark:text-stone-200">
+                  Última lectura: página {savedPageNumber}
+                  {readingProgressPercent !== null ? ` · ${readingProgressPercent}%` : ''}.
+                </span>
+                <button
+                  type="button"
+                  onClick={onResumeReading}
+                  className="shrink-0 rounded-lg bg-stone-900 px-3 py-2 font-semibold text-cream-50 hover:bg-stone-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-terracotta-600 dark:bg-cream-100 dark:text-stone-900 dark:hover:bg-cream-50"
+                >
+                  Retomar lectura
+                </button>
+              </div>
+            )}
+
+            {readingProgressError && (
+              <p className="mb-4 text-xs text-stone-500 dark:text-stone-400" role="status">
+                {readingProgressError}
+              </p>
+            )}
+
             {/* Page Content Body */}
             {isLoadingPages ? (
-              <div className="flex flex-col items-center justify-center py-20 gap-3 opacity-60">
-                <svg
-                  className="animate-spin w-6 h-6 text-terracotta-600 dark:text-terracotta-500"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
+              <div className="space-y-4 py-4" role="status" aria-live="polite">
+                <span className="sr-only">Cargando páginas...</span>
+                <div className="h-4 w-11/12 animate-pulse rounded bg-stone-200/70 dark:bg-surface-300" />
+                <div className="h-4 w-full animate-pulse rounded bg-stone-200/70 dark:bg-surface-300" />
+                <div className="h-4 w-10/12 animate-pulse rounded bg-stone-200/70 dark:bg-surface-300" />
+                <div className="h-4 w-9/12 animate-pulse rounded bg-stone-200/70 dark:bg-surface-300" />
+              </div>
+            ) : pageLoadError ? (
+              <div className="py-12 text-center" role="alert">
+                <p className="text-sm text-rose-700 dark:text-rose-300">{pageLoadError}</p>
+                <button
+                  type="button"
+                  onClick={onRetryPage}
+                  className="mt-3 min-h-10 rounded-lg border border-stone-300 px-4 text-xs font-semibold hover:bg-cream-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-terracotta-600 dark:border-surface-300 dark:hover:bg-surface-200"
                 >
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                </svg>
-                <span className="text-xs font-mono uppercase tracking-widest">Cargando páginas...</span>
+                  Reintentar
+                </button>
               </div>
             ) : (
               <div
                 style={{ fontSize: `${fontSize}px` }}
-                className="font-serif leading-relaxed sm:leading-loose whitespace-pre-line text-justify first-letter:float-left first-letter:text-5xl first-letter:pr-3 first-letter:font-serif first-letter:text-terracotta-600 dark:first-letter:text-terracotta-500"
+                className="font-serif leading-normal whitespace-pre-line text-justify"
               >
-                {currentPageData.texto}
+                {pageCount === 0 ? currentPageData.texto : (page?.texto ?? '')}
               </div>
             )}
           </div>
@@ -268,8 +284,10 @@ export function BookReader({
           }`}
         >
           <button
+            type="button"
             disabled={currentPage === 0}
             onClick={() => onPageChange(Math.max(0, currentPage - 1))}
+            aria-label="Ir a la página anterior"
             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold border border-stone-200 dark:border-surface-300 hover:bg-stone-100 dark:hover:bg-surface-200 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
           >
             <ChevronLeft size={15} />
@@ -277,12 +295,14 @@ export function BookReader({
           </button>
 
           <span className="text-xs font-mono opacity-80">
-            Pág. {currentPage + 1} de {readerPages.length}
+            {pageCount > 0 ? `Pág. ${currentPage + 1} de ${pageCount}` : 'Sin páginas'}
           </span>
 
           <button
-            disabled={currentPage >= readerPages.length - 1}
-            onClick={() => onPageChange(Math.min(readerPages.length - 1, currentPage + 1))}
+            type="button"
+            disabled={pageCount === 0 || currentPage >= pageCount - 1}
+            onClick={() => onPageChange(Math.min(pageCount - 1, currentPage + 1))}
+            aria-label="Ir a la página siguiente"
             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-stone-900 text-stone-50 hover:bg-stone-800 dark:bg-stone-100 dark:text-stone-900 dark:hover:bg-white disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
           >
             Siguiente Página

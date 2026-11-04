@@ -1,15 +1,7 @@
 'use client';
 
 import { BookGenre } from '@babilon/shared-types';
-
-export const GENRES_LIST: BookGenre[] = [
-  'Clásicos',
-  'Filosofía',
-  'Ficción',
-  'Ciencia Ficción',
-  'Poesía',
-  'Historia',
-];
+import { GENRES_LIST } from './bookUploadOptions';
 
 interface MetadataFieldsProps {
   title: string;
@@ -18,14 +10,18 @@ interface MetadataFieldsProps {
   onAuthorChange: (v: string) => void;
   isbn: string;
   onIsbnChange: (v: string) => void;
-  genre: BookGenre;
-  onGenreChange: (v: BookGenre) => void;
-  year: number;
-  onYearChange: (v: number) => void;
+  genre: BookGenre | '';
+  onGenreChange: (v: BookGenre | '') => void;
+  year: number | '';
+  onYearChange: (v: number | '') => void;
   publisher: string;
   onPublisherChange: (v: string) => void;
   coverUrl: string;
   onCoverUrlChange: (v: string) => void;
+  coverPreviewUrl: string;
+  hasCustomCover: boolean;
+  onCoverFileSelect: (file: File) => void;
+  onRemoveCustomCover: () => void;
   synopsis: string;
   onSynopsisChange: (v: string) => void;
 }
@@ -45,6 +41,10 @@ export function MetadataFields({
   onPublisherChange,
   coverUrl,
   onCoverUrlChange,
+  coverPreviewUrl,
+  hasCustomCover,
+  onCoverFileSelect,
+  onRemoveCustomCover,
   synopsis,
   onSynopsisChange,
 }: MetadataFieldsProps) {
@@ -60,6 +60,8 @@ export function MetadataFields({
         <input
           type="text"
           required
+          aria-required="true"
+          autoComplete="off"
           placeholder="ej. Ensayos sobre la lectura y la memoria"
           value={title}
           onChange={(e) => onTitleChange(e.target.value)}
@@ -75,6 +77,8 @@ export function MetadataFields({
           <input
             type="text"
             required
+            aria-required="true"
+            autoComplete="name"
             placeholder="ej. Jorge Luis Borges"
             value={author}
             onChange={(e) => onAuthorChange(e.target.value)}
@@ -99,13 +103,18 @@ export function MetadataFields({
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>
           <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1.5">
-            Género / Disciplina
+            Género / Disciplina *
           </label>
           <select
+            required
+            aria-required="true"
             value={genre}
-            onChange={(e) => onGenreChange(e.target.value as BookGenre)}
+            onChange={(e) => onGenreChange(e.target.value as BookGenre | '')}
             className={inputBaseClasses}
           >
+            <option value="" disabled>
+              Selecciona un género
+            </option>
             {GENRES_LIST.map((g) => (
               <option key={g} value={g}>
                 {g}
@@ -116,14 +125,19 @@ export function MetadataFields({
 
         <div>
           <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1.5">
-            Año de Publicación
+            Año de Publicación *
           </label>
           <input
             type="number"
+            required
+            aria-required="true"
+            step={1}
             min={-3000}
             max={new Date().getFullYear() + 2}
             value={year}
-            onChange={(e) => onYearChange(parseInt(e.target.value) || 0)}
+            onChange={(e) =>
+              onYearChange(e.target.value === '' ? '' : Number(e.target.value))
+            }
             className={inputBaseClasses}
           />
         </div>
@@ -144,29 +158,71 @@ export function MetadataFields({
 
       <div>
         <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1.5">
-          URL de Portada (Opcional)
+          Portada (opcional)
         </label>
-        <input
-          type="url"
-          placeholder="https://ejemplo.org/portada.jpg"
-          value={coverUrl}
-          onChange={(e) => onCoverUrlChange(e.target.value)}
-          className={inputBaseClasses}
-        />
+        {coverPreviewUrl && (
+          <div className="mb-3 flex items-start gap-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={coverPreviewUrl}
+              alt="Vista previa de la portada"
+              className="h-28 w-20 rounded-lg border border-stone-200 object-cover dark:border-surface-300"
+            />
+            <div className="min-w-0 text-xs text-stone-500 dark:text-stone-400">
+              <p>{hasCustomCover ? 'Vista previa local, no se enviará a la API.' : 'Portada detectada o enlazada.'}</p>
+              {hasCustomCover && (
+                <button
+                  type="button"
+                  onClick={onRemoveCustomCover}
+                  className="mt-2 font-semibold text-terracotta-700 underline underline-offset-2 dark:text-terracotta-300"
+                >
+                  Quitar imagen personalizada
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+        <div className="space-y-2">
+          <input
+            type="url"
+            placeholder="https://ejemplo.org/portada.jpg"
+            value={coverUrl}
+            onChange={(e) => onCoverUrlChange(e.target.value)}
+            aria-label="URL de portada"
+            className={inputBaseClasses}
+          />
+          <label className="inline-flex min-h-10 items-center rounded-lg border border-stone-200 px-3 text-xs font-semibold text-stone-700 hover:bg-cream-100 focus-within:outline focus-within:outline-2 focus-within:outline-terracotta-600 dark:border-surface-300 dark:text-stone-200 dark:hover:bg-surface-200">
+            Elegir imagen para vista previa
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) onCoverFileSelect(file);
+                event.target.value = '';
+              }}
+              className="sr-only"
+              aria-label="Elegir una imagen personalizada para vista previa"
+            />
+          </label>
+        </div>
       </div>
 
-      <div>
-        <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1.5">
-          Sinopsis o Argumento
-        </label>
-        <textarea
-          rows={3}
-          placeholder="Breve reseña sobre el contenido de la obra..."
-          value={synopsis}
-          onChange={(e) => onSynopsisChange(e.target.value)}
-          className={inputBaseClasses}
-        />
-      </div>
+      <details className="group rounded-xl border border-stone-200/80 dark:border-surface-300">
+        <summary className="cursor-pointer px-3.5 py-3 text-xs font-semibold text-stone-700 marker:text-terracotta-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-terracotta-600 dark:text-stone-200">
+          Sinopsis o argumento (opcional)
+        </summary>
+        <div className="px-3.5 pb-3.5">
+          <textarea
+            rows={3}
+            placeholder="Breve reseña sobre el contenido de la obra..."
+            value={synopsis}
+            onChange={(e) => onSynopsisChange(e.target.value)}
+            aria-label="Sinopsis o argumento"
+            className={inputBaseClasses}
+          />
+        </div>
+      </details>
     </div>
   );
 }

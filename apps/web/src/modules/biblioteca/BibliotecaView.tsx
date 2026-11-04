@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 
 import { BookCard } from './BookCard';
-import { GenreFilterBar } from './GenreFilterBar';
+import { CatalogFilterDropdown } from './CatalogFilterDropdown';
 import { BookReader } from './BookReader';
 import { BookUploadWizard } from '@/modules/upload/BookUploadWizard';
 import { useBooksCatalog } from './hooks/useBooksCatalog';
@@ -29,8 +29,23 @@ export function BibliotecaView() {
 
   const {
     state: catalog,
-    actions: { setSearchTerm, setSelectedGenre, refreshBooks, loadMoreBooks },
-  } = useBooksCatalog();
+    actions: {
+      setSearchTerm,
+      setAuthorSearch,
+      toggleDraftCategory,
+      toggleDraftAuthor,
+      clearFilterDraft,
+      beginFilterDraft,
+      cancelFilterDraft,
+      applyFilterDraft,
+      refreshBooks,
+      loadMoreBooks,
+    },
+  } = useBooksCatalog({
+    initialQuery: searchParams.get('q') ?? '',
+    initialCategories: searchParams.getAll('category'),
+    initialAuthors: searchParams.getAll('author'),
+  });
 
   const {
     state: reader,
@@ -38,6 +53,8 @@ export function BibliotecaView() {
       openBook,
       closeBook,
       setCurrentPage,
+      resumeReading,
+      retryPageBlock,
       setTheme,
       setFontSize,
       toggleFullscreen,
@@ -156,13 +173,33 @@ export function BibliotecaView() {
             </div>
           </div>
 
-          {/* Filtros de Géneros Dinámicos de la Base de Datos */}
-          <div className="mt-5">
-            <GenreFilterBar
-              selectedGenre={catalog.selectedGenre}
-              onSelectGenre={setSelectedGenre}
-              genres={catalog.availableGenres}
+          <div className="mt-5 flex flex-wrap items-center gap-3">
+            <CatalogFilterDropdown
+              open={catalog.filterMenuOpen}
+              selectedCategories={catalog.selectedCategories}
+              selectedAuthors={catalog.selectedAuthors}
+              draftCategories={catalog.draftCategories}
+              draftAuthors={catalog.draftAuthors}
+              categories={catalog.availableCategories}
+              authors={catalog.availableAuthors}
+              authorLabels={catalog.authorLabels}
+              authorSearch={catalog.authorSearch}
+              activeCount={catalog.selectedFilterCount}
+              isLoadingOptions={catalog.loadingOptions}
+              optionsError={catalog.optionsError}
+              onAuthorSearchChange={setAuthorSearch}
+              onToggleCategory={toggleDraftCategory}
+              onToggleAuthor={toggleDraftAuthor}
+              onOpen={beginFilterDraft}
+              onCancel={cancelFilterDraft}
+              onApply={applyFilterDraft}
+              onClear={clearFilterDraft}
             />
+            {catalog.selectedFilterCount > 0 && (
+              <span className="text-xs text-stone-500 dark:text-stone-400" aria-live="polite">
+                {catalog.selectedFilterCount} filtros activos
+              </span>
+            )}
           </div>
         </div>
       </section>
@@ -242,9 +279,17 @@ export function BibliotecaView() {
       {reader.readingBook && (
         <BookReader
           book={reader.readingBook}
+          page={reader.page}
+          pageCount={reader.pageCount}
+          pageLoadError={reader.pageLoadError}
+          onRetryPage={retryPageBlock}
           onClose={closeBook}
           currentPage={reader.currentPage}
           onPageChange={setCurrentPage}
+          savedPageNumber={reader.savedPageNumber}
+          readingProgressPercent={reader.readingProgressPercent}
+          onResumeReading={resumeReading}
+          readingProgressError={reader.readingProgressError}
           theme={reader.theme}
           onThemeChange={setTheme}
           fontSize={reader.fontSize}

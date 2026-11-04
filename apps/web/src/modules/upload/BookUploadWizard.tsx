@@ -33,7 +33,10 @@ export function BookUploadWizard({
     publisher,
     synopsis,
     coverUrl,
+    coverPreviewUrl,
+    hasCustomCover,
     fullText,
+    cleanedDocument,
     isSubmitting,
     isScanning,
     uploadedFileName,
@@ -48,29 +51,31 @@ export function BookUploadWizard({
 
   return (
     <div className="flex flex-col h-full bg-cream-50 dark:bg-surface-100 text-stone-900 dark:text-stone-100 transition-colors duration-200">
-      {/* Pestañas de Navegación Editorial */}
+      {/* Pasos progresivos de carga y revisión */}
       <div className="flex border-b border-stone-200/80 dark:border-surface-300 bg-cream-100/60 dark:bg-surface-200 px-6 pt-3">
         <button
           type="button"
-          onClick={() => actions.setUploadTab('meta')}
-          className={`pb-3 px-3.5 text-xs font-semibold uppercase tracking-wider border-b-2 transition-all cursor-pointer ${
-            uploadTab === 'meta'
-              ? 'border-stone-900 text-stone-900 dark:border-cream-100 dark:text-stone-100'
-              : 'border-transparent text-stone-500 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-200'
-          }`}
-        >
-          1. Metadatos Bibliográficos
-        </button>
-        <button
-          type="button"
           onClick={() => actions.setUploadTab('content')}
-          className={`pb-3 px-3.5 text-xs font-semibold uppercase tracking-wider border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${
+          aria-current={uploadTab === 'content' ? 'step' : undefined}
+          className={`pb-3 px-3.5 text-xs font-semibold uppercase tracking-wider border-b-2 transition-all cursor-pointer ${
             uploadTab === 'content'
               ? 'border-stone-900 text-stone-900 dark:border-cream-100 dark:text-stone-100'
               : 'border-transparent text-stone-500 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-200'
           }`}
         >
-          <span>2. Ingresa pdf / word / md</span>
+          1. Carga del documento
+        </button>
+        <button
+          type="button"
+          onClick={() => actions.setUploadTab('meta')}
+          aria-current={uploadTab === 'meta' ? 'step' : undefined}
+          className={`pb-3 px-3.5 text-xs font-semibold uppercase tracking-wider border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${
+            uploadTab === 'content'
+              ? 'border-transparent text-stone-500 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-200'
+              : 'border-stone-900 text-stone-900 dark:border-cream-100 dark:text-stone-100'
+          }`}
+        >
+          <span>2. Edición y revisión</span>
           {fullText && (
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
           )}
@@ -87,6 +92,8 @@ export function BookUploadWizard({
               ? 'bg-amber-50/70 dark:bg-amber-950/40 text-amber-900 dark:text-amber-300 border-amber-200/80 dark:border-amber-800'
               : 'bg-rose-50/70 dark:bg-rose-950/40 text-rose-900 dark:text-rose-300 border-rose-200/80 dark:border-rose-800'
           }`}
+          role={statusMessage.type === 'error' ? 'alert' : 'status'}
+          aria-live={statusMessage.type === 'error' ? 'assertive' : 'polite'}
         >
           {statusMessage.type === 'success' ? (
             <CheckCircle2 size={15} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
@@ -100,7 +107,7 @@ export function BookUploadWizard({
       )}
 
       {/* Formulario Modular */}
-      <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-4 flex-1">
+      <form onSubmit={handleSubmit} noValidate className="p-6 overflow-y-auto space-y-4 flex-1">
         {uploadTab === 'meta' ? (
           <MetadataFields
             title={title}
@@ -117,6 +124,10 @@ export function BookUploadWizard({
             onPublisherChange={actions.setPublisher}
             coverUrl={coverUrl}
             onCoverUrlChange={actions.setCoverUrl}
+            coverPreviewUrl={coverPreviewUrl}
+            hasCustomCover={hasCustomCover}
+            onCoverFileSelect={actions.selectCustomCover}
+            onRemoveCustomCover={actions.removeCustomCover}
             synopsis={synopsis}
             onSynopsisChange={actions.setSynopsis}
           />
@@ -125,6 +136,9 @@ export function BookUploadWizard({
             isScanning={isScanning}
             uploadedFileName={uploadedFileName}
             fullText={fullText}
+            structuredDocument={cleanedDocument}
+            title={title}
+            author={author}
             previewEstimatedPages={previewEstimatedPages}
             onFileSelect={actions.handleFileUpload}
             onTextChange={actions.setFullText}
@@ -134,21 +148,21 @@ export function BookUploadWizard({
 
         {/* Pie de Acciones */}
         <div className="pt-3 border-t border-stone-200/80 dark:border-surface-300 flex items-center justify-between">
-          {uploadTab === 'meta' ? (
+          {uploadTab === 'content' ? (
             <button
               type="button"
-              onClick={() => actions.setUploadTab('content')}
+              onClick={() => actions.setUploadTab('meta')}
               className="text-xs text-stone-700 dark:text-stone-300 font-semibold hover:underline cursor-pointer"
             >
-              Siguiente: Adjuntar texto / Escaneo PDF →
+              Continuar a edición de metadatos →
             </button>
           ) : (
             <button
               type="button"
-              onClick={() => actions.setUploadTab('meta')}
+              onClick={() => actions.setUploadTab('content')}
               className="text-xs text-stone-500 dark:text-stone-400 font-semibold hover:underline cursor-pointer"
             >
-              ← Regresar a metadatos
+              ← Regresar a la carga
             </button>
           )}
 
@@ -171,7 +185,7 @@ export function BookUploadWizard({
               {isSubmitting ? (
                 <>
                   <Loader2 size={13} className="animate-spin" />
-                  <span>Incorporando a la base...</span>
+                  <span>Guardando obra y contenido...</span>
                 </>
               ) : (
                 <>
