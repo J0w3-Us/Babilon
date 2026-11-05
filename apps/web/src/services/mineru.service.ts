@@ -1,5 +1,24 @@
 import { MinerUScanResult } from '@babilon/shared-types';
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isMinerUScanResult(value: unknown): value is MinerUScanResult {
+  if (!isRecord(value) || value.engine !== 'mineru' || value.success !== true) return false;
+  if (typeof value.rawMarkdown !== 'string') return false;
+  if (!Array.isArray(value.paginas) || typeof value.pageCount !== 'number') return false;
+  if (value.pageCount !== value.paginas.length) return false;
+
+  return value.paginas.every(
+    (page, index) =>
+      isRecord(page) &&
+      page.numero === index + 1 &&
+      typeof page.texto === 'string' &&
+      typeof page.conteo_palabras === 'number'
+  );
+}
+
 export interface IMinerUScannerService {
   scan(file: File): Promise<{
     success: boolean;
@@ -29,18 +48,35 @@ export class MinerUHttpScannerService implements IMinerUScannerService {
         body: formData,
       });
 
-      const json = await res.json();
-      if (!res.ok || !json.success) {
+      const responseBody: unknown = await res.json();
+      if (!isRecord(responseBody)) {
         return {
           success: false,
-          message: json.message || 'Error al procesar el documento con MinerU.',
+          message: 'El servicio de escaneo devolvió una respuesta con formato inválido.',
+        };
+      }
+
+      if (!res.ok || responseBody.success !== true) {
+        return {
+          success: false,
+          message:
+            typeof responseBody.message === 'string'
+              ? responseBody.message
+              : 'Error al procesar el documento con MinerU.',
+        };
+      }
+
+      if (!isMinerUScanResult(responseBody.data)) {
+        return {
+          success: false,
+          message: 'MinerU no devolvió páginas estructuradas válidas.',
         };
       }
 
       return {
         success: true,
-        data: json.data as MinerUScanResult,
-        message: json.message,
+        data: responseBody.data,
+        message: typeof responseBody.message === 'string' ? responseBody.message : undefined,
       };
     } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : 'Error en la petición de escaneo';

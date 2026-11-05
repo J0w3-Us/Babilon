@@ -1,147 +1,167 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { processMinerUOutput } from '@/lib/mineruParser';
-import { formatPagesToDocument } from '@/lib/pageSplitter';
-import { extractText, getDocumentProxy } from 'unpdf';
+import type { MinerUScanResult } from '@babilon/shared-types';
 import { spawn } from 'child_process';
 import { promises as fs } from 'fs';
-import path from 'path';
 import os from 'os';
+import path from 'path';
+import { extractText, getDocumentProxy } from 'unpdf';
+import {
+  buildPaginasFromMiddleJson,
+  buildPaginasFromPageTexts,
+  type BuiltBookPage,
+  validatePaginasCoverage,
+} from '@/lib/buildPaginasFromMiddleJson';
+import { processMinerUOutput } from '@/lib/mineruParser';
+import { formatPagesToDocument } from '@/lib/pageSplitter';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-/**
- * Extrae el texto del PDF con unpdf y genera un Markdown estructurado
- * donde cada página real del PDF se convierte en una sección separada por ---.
- *
- * Estrategia de división:
- * 1. Cada página PDF → una sección `## Página N`.
- * 2. Si el texto de una página contiene encabezados H1/H2 claros de capítulo
- *    (e.g. "# Capítulo 1", "## Introducción"), esos se preservan como divisores
- *    de capítulo adicionalmente.
- * 3. Las páginas vacías o con menos de 30 chars se fusionan con la siguiente.
- */
-async function extractWithUnpdf(uint8Array: Uint8Array) {
-  const doc = await getDocumentProxy(uint8Array);
-  const metadata = await doc.getMetadata();
-  const info = metadata?.info as Record<string, unknown> | undefined;
-
-  const { totalPages, text } = await extractText(doc, { mergePages: false });
-
-  const pages: Array<{ pageNum: number; content: string }> = [];
-
-  if (Array.isArray(text) && text.length > 0) {
-    let pendingBuffer = '';
-    let pendingNum = 0;
-
-    for (let i = 0; i < text.length; i++) {
-      const raw = text[i].trim();
-
-      // Limpiar espacios excesivos / líneas vacías múltiples
-      const cleaned = raw
-        .split('\n')
-        .map((l) => l.trim())
-        .filter(Boolean)
-        .join('\n');
-
-      if (!cleaned || cleaned.length < 30) {
-        // Página casi vacía: acumular en buffer
-        pendingBuffer += (pendingBuffer ? '\n' : '') + cleaned;
-        if (!pendingNum) pendingNum = i + 1;
-        continue;
-      }
-
-      // Si hay buffer acumulado, prefijarlo a esta página
-      const fullContent = pendingBuffer
-        ? `${pendingBuffer}\n${cleaned}`
-        : cleaned;
-
-      pages.push({
-        pageNum: pendingNum || i + 1,
-        content: fullContent,
-      });
-
-      pendingBuffer = '';
-      pendingNum = 0;
-    }
-
-    // Volcar buffer restante como última página si tiene contenido
-    if (pendingBuffer.trim()) {
-      pages.push({
-        pageNum: pendingNum || text.length,
-        content: pendingBuffer.trim(),
-      });
-    }
-  }
-
-  // Construir documento final estructurado por páginas claras y legibles
-  const structuredPages = pages.map(({ pageNum, content }) => {
-    const lines = content
-      .split('\n')
-      .map((l) => l.trim())
-      .filter(Boolean);
-    return {
-      numero: pageNum,
-      texto: lines.join('\n\n'),
-    };
-  });
-
-  const fullMarkdown = formatPagesToDocument(structuredPages);
-
-  const title = (info?.Title as string)?.trim() || '';
-  const author = (info?.Author as string)?.trim() || '';
-
-  return {
-    markdown: fullMarkdown,
-    title,
-    author,
-    pageCount: pages.length || totalPages || 1,
-    pages, // Pasamos las páginas directamente para que el parser tenga más contexto
-    engine: 'unpdf-serverless',
-  };
-}
-
-async function tryExtractWithPython(scriptPath: string, filePath: string): Promise<{
-  markdown?: string;
+interface PythonExtractionResult {
+  middleJson?: unknown;
+  pages?: Array<{ pageNumber: number; markdown: string }>;
   title?: string;
   author?: string;
   pageCount?: number;
   engine?: string;
-} | null> {
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+async function extractWithUnpdf(doc: Awaited<ReturnType<typeof getDocumentProxy>>) {
+  const metadata = await doc.getMetadata();
+  const info = metadata?.info as Record<string, unknown> | undefined;
+  const { totalPages, text } = await extractText(doc, { mergePages: false });
+
+  if (!Array.isArray(text) || text.length !== totalPages) {
+    throw new Error(
+      `unpdf devolvió ${Array.isArray(text) ? text.length : 0} páginas de texto para un PDF de ${totalPages} páginas.`
+    );
+  }
+
+  const paginas = buildPaginasFromPageTexts(
+    text.map((pageText, index) => ({ pageNumber: index + 1, text: pageText })),
+    totalPages
+  );
+  const referenceWordCount = (Array.isArray(text) ? text : []).reduce(
+    (sum, pageText) => sum + pageText.trim().split(/\s+/u).filter(Boolean).length,
+    0
+  );
+  const validation = validatePaginasCoverage(paginas, totalPages, referenceWordCount);
+
+  return {
+    paginas,
+    title: typeof info?.Title === 'string' ? info.Title.trim() : '',
+    author: typeof info?.Author === 'string' ? info.Author.trim() : '',
+    warnings: validation.warnings,
+  };
+}
+
+async function tryExtractWithPython(
+  scriptPath: string,
+  filePath: string,
+  outputDir: string
+): Promise<PythonExtractionResult | null> {
   return new Promise((resolve) => {
     try {
-      const pyProcess = spawn('python', [scriptPath, filePath]);
+      const pyProcess = spawn('python', [scriptPath, filePath, outputDir]);
       let stdout = '';
       let stderr = '';
 
       pyProcess.stdout.on('data', (chunk) => {
         stdout += chunk.toString();
       });
-
       pyProcess.stderr.on('data', (chunk) => {
         stderr += chunk.toString();
       });
 
-      pyProcess.on('error', (err) => {
-        console.warn('Python no disponible en este entorno:', err.message);
+      pyProcess.on('error', (error) => {
+        console.warn('Python no disponible en este entorno:', error.message);
         resolve(null);
       });
 
       pyProcess.on('close', (code) => {
-        if (code === 0 && stdout.trim()) {
-          try {
-            resolve(JSON.parse(stdout));
-          } catch {
+        if (code !== 0 || !stdout.trim()) {
+          if (stderr.trim()) console.warn('Falló el extractor Python:', stderr.trim());
+          resolve(null);
+          return;
+        }
+
+        try {
+          const result: unknown = JSON.parse(stdout);
+          if (!isRecord(result) || typeof result.error === 'string') {
+            console.warn(
+              'El extractor Python devolvió un resultado inválido:',
+              isRecord(result) ? result.error : 'formato desconocido'
+            );
             resolve(null);
+            return;
           }
-        } else {
+
+          const pages = Array.isArray(result.pages)
+            ? result.pages.flatMap((page): Array<{ pageNumber: number; markdown: string }> => {
+                if (
+                  !isRecord(page) ||
+                  typeof page.pageNumber !== 'number' ||
+                  typeof page.markdown !== 'string'
+                ) {
+                  return [];
+                }
+                return [{ pageNumber: page.pageNumber, markdown: page.markdown }];
+              })
+            : undefined;
+
+          resolve({
+            middleJson: result.middleJson,
+            pages,
+            title: typeof result.title === 'string' ? result.title : undefined,
+            author: typeof result.author === 'string' ? result.author : undefined,
+            pageCount: typeof result.pageCount === 'number' ? result.pageCount : undefined,
+            engine: typeof result.engine === 'string' ? result.engine : undefined,
+          });
+        } catch {
+          console.warn('No se pudo interpretar la respuesta JSON del extractor Python.');
           resolve(null);
         }
       });
-    } catch {
+    } catch (error) {
+      console.warn('No se pudo iniciar el extractor Python:', error);
       resolve(null);
     }
   });
+}
+
+function makeScanResult(
+  paginas: BuiltBookPage[],
+  filename: string,
+  metadata: Record<string, unknown> | undefined,
+  startTime: number,
+  warnings: string[] = []
+): MinerUScanResult {
+  const markdown = formatPagesToDocument(paginas);
+  const parsed = processMinerUOutput({
+    markdown,
+    filename,
+    metadata,
+    processingTimeMs: Date.now() - startTime,
+  });
+  if (!parsed.metadata) {
+    throw new Error('El parser de MinerU no generó los metadatos de extracción esperados.');
+  }
+
+  return {
+    ...parsed,
+    paginas,
+    pages: paginas.map(({ numero, texto }) => ({ pageNumber: numero, markdown: texto })),
+    pageCount: paginas.length,
+    metadata: {
+      ...parsed.metadata,
+      pageCountEstimate: paginas.length,
+    },
+    warnings: warnings.length > 0 ? warnings : undefined,
+  };
 }
 
 export async function POST(request: NextRequest) {
@@ -149,9 +169,9 @@ export async function POST(request: NextRequest) {
 
   try {
     const formData = await request.formData();
-    const file = formData.get('file') as File | null;
+    const file = formData.get('file');
 
-    if (!file) {
+    if (!(file instanceof File)) {
       return NextResponse.json(
         { success: false, message: 'No se ha proporcionado ningún archivo para procesar.' },
         { status: 400 }
@@ -160,7 +180,6 @@ export async function POST(request: NextRequest) {
 
     const filename = file.name || 'documento.pdf';
     const isPdf = file.type === 'application/pdf' || filename.toLowerCase().endsWith('.pdf');
-
     if (!isPdf) {
       return NextResponse.json(
         { success: false, message: 'MinerU requiere un archivo en formato PDF.' },
@@ -168,10 +187,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const uint8Array = new Uint8Array(await file.arrayBuffer());
+    const pdfDocument = await getDocumentProxy(uint8Array);
+    const expectedPageCount = pdfDocument.numPages;
+    if (!Number.isInteger(expectedPageCount) || expectedPageCount < 1) {
+      throw new Error('No se pudo determinar la cantidad de páginas físicas del PDF.');
+    }
+
+    const warnings: string[] = [];
     const mineruServiceUrl = process.env.MINERU_API_URL?.replace(/\/+$/, '');
     const mineruApiKey = process.env.MINERU_API_KEY;
-
-    // 1. Servicio MinerU remoto (si no apunta a localhost desde la nube)
     const isLocalhost =
       mineruServiceUrl?.includes('localhost') || mineruServiceUrl?.includes('127.0.0.1');
     const isCloud = !!process.env.VERCEL || process.env.NODE_ENV === 'production';
@@ -179,11 +204,11 @@ export async function POST(request: NextRequest) {
     if (mineruServiceUrl && !(isCloud && isLocalhost)) {
       const forwardFormData = new FormData();
       forwardFormData.append('file', file, filename);
+      forwardFormData.append('format', 'middle_json');
+      forwardFormData.append('pages', 'all');
 
       const headers: Record<string, string> = {};
-      if (mineruApiKey) {
-        headers['Authorization'] = `Bearer ${mineruApiKey}`;
-      }
+      if (mineruApiKey) headers.Authorization = `Bearer ${mineruApiKey}`;
 
       try {
         const response = await fetch(`${mineruServiceUrl}/api/v1/extract`, {
@@ -194,131 +219,181 @@ export async function POST(request: NextRequest) {
         });
 
         if (response.ok) {
-          const remoteData = await response.json();
-          const extractedMarkdown =
-            remoteData.markdown ||
-            remoteData.text ||
-            (Array.isArray(remoteData.pages)
-              ? formatPagesToDocument(
-                  remoteData.pages.map(
-                    (p: { markdown?: string; text?: string; pageNumber?: number }, idx: number) => ({
-                      numero: p.pageNumber || idx + 1,
-                      texto: p.markdown || p.text || '',
-                    })
-                  )
-                )
-              : '');
+          const remoteData: unknown = await response.json();
+          const remotePayload =
+            isRecord(remoteData) && isRecord(remoteData.data) ? remoteData.data : remoteData;
 
-          const parsed = processMinerUOutput({
-            markdown: extractedMarkdown,
-            filename,
-            metadata: remoteData.metadata,
-            processingTimeMs: Date.now() - startTime,
-          });
-
-          return NextResponse.json({
-            success: true,
-            data: parsed,
-            engine: 'mineru-remote-api',
-          });
+          if (isRecord(remotePayload)) {
+            const middleJson =
+              remotePayload.middle_json ??
+              remotePayload.middleJson ??
+              (Array.isArray(remotePayload.pages) ? remotePayload : undefined);
+            if (middleJson !== undefined) {
+              try {
+                const paginas = buildPaginasFromMiddleJson(middleJson, expectedPageCount);
+                const metadata = isRecord(remotePayload.metadata)
+                  ? remotePayload.metadata
+                  : undefined;
+                const validation = validatePaginasCoverage(
+                  paginas,
+                  expectedPageCount,
+                  paginas.reduce((sum, page) => sum + page.conteo_palabras, 0)
+                );
+                warnings.push(...validation.warnings);
+                return NextResponse.json({
+                  success: true,
+                  data: makeScanResult(paginas, filename, metadata, startTime, warnings),
+                  engine: 'mineru-remote-middle-json',
+                  stats: {
+                    totalPages: expectedPageCount,
+                    extractedSections: paginas.length,
+                  },
+                });
+              } catch (error) {
+                const detail = error instanceof Error ? error.message : String(error);
+                warnings.push(`El resultado remoto de MinerU no pudo validarse: ${detail}`);
+              }
+            } else {
+              warnings.push(
+                'MinerU remoto no devolvió middle_json; se continuará con extracción local por página.'
+              );
+            }
+          } else {
+            warnings.push('MinerU remoto devolvió una respuesta con formato inválido.');
+          }
+        } else {
+          warnings.push(`MinerU remoto respondió con HTTP ${response.status}.`);
         }
-      } catch (remoteErr) {
-        console.warn('MinerU remote endpoint unreachable, using local engine:', remoteErr);
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        warnings.push(`No se pudo usar MinerU remoto: ${detail}`);
       }
     }
 
-    const arrayBuffer = await file.arrayBuffer();
-    const uint8Array = new Uint8Array(arrayBuffer);
-
-    // 2. Intentar extracción con Python (local/dev, no disponible en Vercel)
     const scriptPath = path.join(process.cwd(), 'src', 'lib', 'pdf_extractor.py');
-    const tempDir = os.tmpdir();
-    const tempFilePath = path.join(
-      tempDir,
-      `babilon_pdf_${Date.now()}_${filename.replace(/[^a-zA-Z0-9.-]/g, '_')}`
-    );
-
-    let pythonResult: {
-      markdown?: string;
-      title?: string;
-      author?: string;
-      pageCount?: number;
-      engine?: string;
-    } | null = null;
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'babilon-mineru-'));
+    let pythonResult: PythonExtractionResult | null = null;
 
     try {
-      await fs.writeFile(tempFilePath, Buffer.from(arrayBuffer));
-      pythonResult = await tryExtractWithPython(scriptPath, tempFilePath);
-    } catch {
-      // Ignorar
+      const safeFilename = filename.replace(/[^a-zA-Z0-9.-]/g, '_');
+      const tempFilePath = path.join(tempDir, safeFilename || 'documento.pdf');
+      const outputDir = path.join(tempDir, 'mineru-output');
+      await fs.writeFile(tempFilePath, Buffer.from(uint8Array));
+      pythonResult = await tryExtractWithPython(scriptPath, tempFilePath, outputDir);
     } finally {
+      await fs.rm(tempDir, { recursive: true, force: true });
+    }
+
+    if (!pythonResult) {
+      warnings.push(
+        'No se pudo ejecutar una extracción local estructurada; unpdf conservará las páginas físicas, pero no aplica OCR.'
+      );
+    } else if (pythonResult.engine === 'pymupdf-page-text') {
+      warnings.push('Se usó PyMuPDF sin OCR; las páginas escaneadas pueden quedar sin texto.');
+    }
+
+    if (pythonResult?.middleJson !== undefined) {
       try {
-        await fs.unlink(tempFilePath);
-      } catch {
-        // Ignorar
+        const paginas = buildPaginasFromMiddleJson(
+          pythonResult.middleJson,
+          expectedPageCount
+        );
+        const validation = validatePaginasCoverage(
+          paginas,
+          expectedPageCount,
+          paginas.reduce((sum, page) => sum + page.conteo_palabras, 0)
+        );
+        warnings.push(...validation.warnings);
+        return NextResponse.json({
+          success: true,
+          data: makeScanResult(
+            paginas,
+            filename,
+            { title: pythonResult.title, author: pythonResult.author },
+            startTime,
+            warnings
+          ),
+          engine: pythonResult.engine || 'mineru-local-middle-json',
+          stats: {
+            totalPages: expectedPageCount,
+            extractedSections: paginas.length,
+          },
+        });
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        warnings.push(`El middle_json local de MinerU no pudo validarse: ${detail}`);
       }
     }
 
-    if (pythonResult && pythonResult.markdown) {
-      const parsed = processMinerUOutput({
-        markdown: pythonResult.markdown,
-        filename,
-        metadata: {
-          title: pythonResult.title,
-          author: pythonResult.author,
-          pageCount: pythonResult.pageCount,
-        },
-        processingTimeMs: Date.now() - startTime,
-      });
-
-      return NextResponse.json({
-        success: true,
-        data: parsed,
-        engine: pythonResult.engine || 'mineru-local-python',
-      });
+    if (pythonResult?.pages) {
+      try {
+        if (pythonResult.pageCount !== expectedPageCount) {
+          throw new Error(
+            `El extractor Python reportó ${pythonResult.pageCount ?? 0} páginas; se esperaban ${expectedPageCount}.`
+          );
+        }
+        const paginas = buildPaginasFromPageTexts(
+          pythonResult.pages.map(({ pageNumber, markdown }) => ({
+            pageNumber,
+            text: markdown,
+          })),
+          expectedPageCount
+        );
+        const validation = validatePaginasCoverage(
+          paginas,
+          expectedPageCount,
+          paginas.reduce((sum, page) => sum + page.conteo_palabras, 0)
+        );
+        warnings.push(...validation.warnings);
+        return NextResponse.json({
+          success: true,
+          data: makeScanResult(
+            paginas,
+            filename,
+            { title: pythonResult.title, author: pythonResult.author },
+            startTime,
+            warnings
+          ),
+          engine: pythonResult.engine || 'mineru-local-python',
+          stats: {
+            totalPages: expectedPageCount,
+            extractedSections: paginas.length,
+          },
+        });
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        warnings.push(`La extracción Python no conservó la paginación: ${detail}`);
+      }
     }
 
-    // 3. Motor nativo serverless: unpdf (100% Node.js, compatible con Vercel)
-    try {
-      const unpdfResult = await extractWithUnpdf(uint8Array);
-
-      const parsed = processMinerUOutput({
-        markdown: unpdfResult.markdown,
+    const unpdfResult = await extractWithUnpdf(pdfDocument);
+    const validation = validatePaginasCoverage(
+      unpdfResult.paginas,
+      expectedPageCount,
+      unpdfResult.paginas.reduce((sum, page) => sum + page.conteo_palabras, 0)
+    );
+    warnings.push(...validation.warnings);
+    return NextResponse.json({
+      success: true,
+      data: makeScanResult(
+        unpdfResult.paginas,
         filename,
-        metadata: {
-          title: unpdfResult.title,
-          author: unpdfResult.author,
-          pageCount: unpdfResult.pageCount,
-        },
-        processingTimeMs: Date.now() - startTime,
-      });
-
-      return NextResponse.json({
-        success: true,
-        data: parsed,
-        engine: 'babilon-native-engine',
-        stats: {
-          totalPages: unpdfResult.pageCount,
-          extractedSections: unpdfResult.pages?.length || 0,
-        },
-      });
-    } catch (parseErr) {
-      console.error('Error en extracción nativa:', parseErr);
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            'No se pudo extraer el texto del PDF. Puedes ingresar los datos y el contenido manualmente.',
-        },
-        { status: 422 }
-      );
-    }
-  } catch (err: unknown) {
-    const errorMsg = err instanceof Error ? err.message : 'Error desconocido';
-    console.error('Error en /api/v1/scan/mineru:', err);
+        { title: unpdfResult.title, author: unpdfResult.author },
+        startTime,
+        warnings
+      ),
+      engine: 'babilon-native-engine',
+      stats: {
+        totalPages: expectedPageCount,
+        extractedSections: unpdfResult.paginas.length,
+      },
+    });
+  } catch (error: unknown) {
+    const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
+    console.error('Error en /api/v1/scan/mineru:', error);
     return NextResponse.json(
       { success: false, message: `Error al procesar el PDF: ${errorMsg}` },
-      { status: 500 }
+      { status: 422 }
     );
   }
 }

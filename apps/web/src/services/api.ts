@@ -18,16 +18,6 @@ export interface FetchBooksResult {
   nextCursor?: string | null;
 }
 
-export interface CatalogFacetOption {
-  value: string;
-  label: string;
-}
-
-export interface CatalogFacets {
-  categories: string[];
-  authors: CatalogFacetOption[];
-}
-
 async function apiFetch<T>(endpoint: string, options?: RequestInit): Promise<{ data: T | null; response: Response | null }> {
   let response: Response | null = null;
   try {
@@ -139,37 +129,18 @@ export async function getBooksApi(params?: {
 }
 
 /**
- * Obtiene un bloque acotado de páginas; el catálogo nunca descarga el texto completo.
+ * Obtiene un bloque de páginas desde el detalle completo del libro.
+ * La API publicada entrega el contenido en el endpoint de detalle.
  */
 export async function getBookPagesApi(
   bookId: string,
   fromPage: number,
   limit = 10
 ): Promise<{ pages: BookPage[]; total: number }> {
-  const query = new URLSearchParams({
-    desde: String(fromPage),
-    limite: String(limit),
-  });
-  const { data, response } = await apiFetch<unknown>(
-    `/api/backend/api/libros/${encodeURIComponent(bookId)}/paginas?${query}`
-  );
-  if (response?.status === 404) {
-    return getLegacyBookPagesApi(bookId, fromPage, limit);
-  }
-
-  const payload = isRecord(data) && isRecord(data.data) ? data.data : data;
-  if (!isRecord(payload) || !Array.isArray(payload.pages) || typeof payload.total !== 'number') {
-    throw new Error('La API devolvió una respuesta de páginas inválida.');
-  }
-
-  const pages = payload.pages.filter(isRecord).map((page) => ({
-    numero: Number(page.pageNumber),
-    texto: String(page.text ?? ''),
-  }));
-  return { pages, total: payload.total };
+  return getBookPagesFromBookDetail(bookId, fromPage, limit);
 }
 
-async function getLegacyBookPagesApi(
+async function getBookPagesFromBookDetail(
   bookId: string,
   fromPage: number,
   limit: number
@@ -182,7 +153,7 @@ async function getLegacyBookPagesApi(
     throw new Error(
       response?.status === 404
         ? 'No se encontró el libro solicitado.'
-        : 'El backend aún no tiene disponible la ruta de páginas y no pudo cargar el contenido antiguo.'
+        : 'No se pudo cargar el detalle del libro.'
     );
   }
 
@@ -214,7 +185,7 @@ async function getLegacyBookPagesApi(
   const total = Number(book.total_paginas ?? book.pageCount ?? pages.length);
   if (pages.length === 0 && total > 0) {
     throw new Error(
-      'El servidor no encuentra páginas embebidas. Despliega la API con la ruta de páginas diferidas.'
+      'El detalle del libro no incluye las páginas que indica su total.'
     );
   }
 
@@ -224,30 +195,9 @@ async function getLegacyBookPagesApi(
   };
 }
 
-export async function getCatalogFacetsApi(
-  authorQuery = '',
-  selectedAuthors: string[] = []
-): Promise<CatalogFacets> {
-  const query = new URLSearchParams({ authorQuery, authorLimit: '50' });
-  selectedAuthors.forEach((author) => query.append('selectedAuthor', author));
-  const { data } = await apiFetch<unknown>(`/api/backend/api/libros/facetas?${query}`);
-  const payload = isRecord(data) && isRecord(data.data) ? data.data : data;
-  if (!isRecord(payload) || !Array.isArray(payload.categories) || !Array.isArray(payload.authors)) {
-    throw new Error('La API devolvió opciones de filtros inválidas.');
-  }
-
-  return {
-    categories: payload.categories.filter((value): value is string => typeof value === 'string'),
-    authors: payload.authors.filter(
-      (value): value is CatalogFacetOption =>
-        isRecord(value) && typeof value.value === 'string' && typeof value.label === 'string'
-    ),
-  };
-}
-
 /**
  * Registra o actualiza un libro en la API publicada.
- * Persiste solo los metadatos. El texto se envía en lotes separados.
+ * Envía metadatos y contenido juntos al endpoint de creación soportado por la API.
  */
 export async function createBookApi(book: {
   title: string;
@@ -259,6 +209,7 @@ export async function createBookApi(book: {
   publisher: string;
   pageCount: number;
   coverUrl?: string;
+  paginas?: BookPage[];
 }): Promise<{ success: boolean; bookId?: string; message?: string }> {
   const coverUrl = book.coverUrl ? normalizeCoverUrl(book.coverUrl) : undefined;
   if (book.coverUrl && !coverUrl) {
@@ -282,16 +233,18 @@ export async function createBookApi(book: {
       // La portada se almacena como URL; nunca se envían archivos ni imágenes embebidas.
       portada_url: coverUrl,
       coverUrl,
+      paginas: book.paginas,
     }),
   });
 
-  if (isRecord(data) && data.success === true) {
-    const id = typeof data.upsertedId === 'string'
+  const createdBook = extractSingleBook(data);
+  if ((isRecord(data) && data.success === true) || createdBook) {
+    const id = isRecord(data) && typeof data.upsertedId === 'string'
       ? data.upsertedId
-      : book.isbn;
+      : createdBook?._id ?? createdBook?.id;
     return {
       success: true,
-      bookId: id,
+      bookId: typeof id === 'string' ? id : undefined,
       message: getApiMessage(data) || 'Libro guardado exitosamente en la API de libros',
     };
   }
@@ -299,33 +252,6 @@ export async function createBookApi(book: {
   return {
     success: false,
     message: getApiMessage(data) || 'No se pudo registrar el libro en la API',
-  };
-}
-
-export async function uploadBookPagesApi(
-  bookId: string,
-  pages: BookPage[],
-  complete: boolean,
-  totalPages: number
-): Promise<{ success: boolean; message?: string }> {
-  const { data } = await apiFetch<unknown>(
-    `/api/backend/api/libros/${encodeURIComponent(bookId)}/paginas`,
-    {
-      method: 'POST',
-      body: JSON.stringify({
-        pages: pages.map((page) => ({ pageNumber: page.numero, text: page.texto })),
-        complete,
-        totalPages,
-      }),
-    }
-  );
-
-  if (isRecord(data) && data.success === true) {
-    return { success: true };
-  }
-  return {
-    success: false,
-    message: getApiMessage(data) || 'No se pudo guardar el lote de páginas.',
   };
 }
 

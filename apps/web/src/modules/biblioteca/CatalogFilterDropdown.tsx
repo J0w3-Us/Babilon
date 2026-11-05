@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef } from 'react';
 import { Check, ChevronDown, Filter, Search, X } from 'lucide-react';
-import { CatalogFacetOption } from '@/services/api';
 
 interface CatalogFilterDropdownProps {
   open: boolean;
@@ -11,12 +10,10 @@ interface CatalogFilterDropdownProps {
   draftCategories: string[];
   draftAuthors: string[];
   categories: string[];
-  authors: CatalogFacetOption[];
+  authors: { value: string; label: string }[];
   authorLabels: Record<string, string>;
   authorSearch: string;
   activeCount: number;
-  isLoadingOptions: boolean;
-  optionsError: string | null;
   onAuthorSearchChange: (value: string) => void;
   onToggleCategory: (value: string) => void;
   onToggleAuthor: (value: string, label: string) => void;
@@ -37,8 +34,6 @@ export function CatalogFilterDropdown({
   authorLabels,
   authorSearch,
   activeCount,
-  isLoadingOptions,
-  optionsError,
   onAuthorSearchChange,
   onToggleCategory,
   onToggleAuthor,
@@ -197,19 +192,11 @@ export function CatalogFilterDropdown({
                 />
               </label>
 
-              {optionsError ? (
-                <p role="alert" className="px-2 py-3 text-xs text-rose-700 dark:text-rose-300">
-                  {optionsError}
-                </p>
-              ) : isLoadingOptions ? (
-                <p className="px-2 py-3 text-xs text-stone-500 dark:text-stone-400" role="status">
-                  Buscando autores...
-                </p>
-              ) : authorOptions.length === 0 ? (
+              {authorOptions.length === 0 ? (
                 <p className="px-2 py-3 text-xs text-stone-500 dark:text-stone-400">
                   {authorSearch.trim()
                     ? 'No hay autores que coincidan con la búsqueda.'
-                    : 'No hay autores disponibles.'}
+                    : 'Los autores aparecerán cuando haya obras cargadas en el catálogo.'}
                 </p>
               ) : (
                 <div className="max-h-48 overflow-y-auto">

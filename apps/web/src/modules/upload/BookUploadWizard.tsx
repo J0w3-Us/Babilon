@@ -31,17 +31,12 @@ export function BookUploadWizard({
     genre,
     year,
     publisher,
-    synopsis,
-    coverUrl,
     coverPreviewUrl,
     hasCustomCover,
     fullText,
-    cleanedDocument,
     isSubmitting,
     isScanning,
-    uploadedFileName,
     statusMessage,
-    previewEstimatedPages,
   } = state;
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -114,35 +109,22 @@ export function BookUploadWizard({
             onTitleChange={actions.setTitle}
             author={author}
             onAuthorChange={actions.setAuthor}
-            isbn={isbn}
-            onIsbnChange={actions.setIsbn}
             genre={genre}
             onGenreChange={actions.setGenre}
             year={year}
             onYearChange={actions.setYear}
             publisher={publisher}
             onPublisherChange={actions.setPublisher}
-            coverUrl={coverUrl}
-            onCoverUrlChange={actions.setCoverUrl}
             coverPreviewUrl={coverPreviewUrl}
             hasCustomCover={hasCustomCover}
             onCoverFileSelect={actions.selectCustomCover}
             onRemoveCustomCover={actions.removeCustomCover}
-            synopsis={synopsis}
-            onSynopsisChange={actions.setSynopsis}
+            isbn={isbn}
           />
         ) : (
           <FileDropzone
             isScanning={isScanning}
-            uploadedFileName={uploadedFileName}
-            fullText={fullText}
-            structuredDocument={cleanedDocument}
-            title={title}
-            author={author}
-            previewEstimatedPages={previewEstimatedPages}
             onFileSelect={actions.handleFileUpload}
-            onTextChange={actions.setFullText}
-            onClearFile={actions.clearFile}
           />
         )}
 

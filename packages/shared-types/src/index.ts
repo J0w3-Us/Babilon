@@ -159,6 +159,8 @@ export interface MinerUScanResult {
   success: boolean;
   rawMarkdown: string;
   pages?: MinerUPageOutput[];
+  paginas?: BookPage[];
+  pageCount?: number;
   metadata?: ExtractedBookMetadata;
   suggestedTitle?: string;
   suggestedAuthor?: string;
@@ -173,4 +175,3 @@ export interface MinerUScanOptions {
   extractImages?: boolean;
   language?: string;
 }
-

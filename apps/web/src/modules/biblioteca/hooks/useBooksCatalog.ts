@@ -2,13 +2,17 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Book } from '@babilon/shared-types';
 import {
   getBooksApi,
-  getCatalogFacetsApi,
   checkApiHealth,
   HealthInfo,
-  CatalogFacetOption,
 } from '@/services/api';
+import { GENRES_LIST } from '@/modules/upload/bookUploadOptions';
 
 export const PAGE_SIZE = 20;
+
+interface CatalogAuthorOption {
+  value: string;
+  label: string;
+}
 
 function toggleValue(values: string[], value: string): string[] {
   return values.includes(value)
@@ -49,10 +53,7 @@ export function useBooksCatalog({
   const [authorLabels, setAuthorLabels] = useState<Record<string, string>>({});
   const [authorSearch, setAuthorSearch] = useState('');
   const [filterMenuOpen, setFilterMenuOpen] = useState(false);
-  const [availableCategories, setAvailableCategories] = useState<string[]>([]);
-  const [availableAuthors, setAvailableAuthors] = useState<CatalogFacetOption[]>([]);
-  const [loadingOptions, setLoadingOptions] = useState(false);
-  const [optionsError, setOptionsError] = useState<string | null>(null);
+  const [knownAuthors, setKnownAuthors] = useState<CatalogAuthorOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [health, setHealth] = useState<HealthInfo | null>(null);
@@ -61,6 +62,21 @@ export function useBooksCatalog({
   const [hasMore, setHasMore] = useState(false);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const requestId = useRef(0);
+
+  const rememberAuthors = useCallback((booksToRemember: Book[]) => {
+    setKnownAuthors((previous) => {
+      const authors = new Map(previous.map((author) => [author.value, author]));
+      booksToRemember.forEach((book) => {
+        const name = book.author?.name?.trim();
+        if (!name) return;
+        const value = book.author.id?.trim() || name;
+        authors.set(value, { value, label: name });
+      });
+      return Array.from(authors.values()).sort((left, right) =>
+        left.label.localeCompare(right.label, 'es', { sensitivity: 'base' })
+      );
+    });
+  }, []);
 
   const fetchBooks = useCallback(async () => {
     const activeRequest = ++requestId.current;
@@ -75,6 +91,7 @@ export function useBooksCatalog({
       });
       if (activeRequest !== requestId.current) return;
 
+      rememberAuthors(result.books);
       setBooks(result.books);
       setTotalCount(result.total);
       setHasMore(result.hasMore ?? false);
@@ -86,7 +103,7 @@ export function useBooksCatalog({
     } finally {
       if (activeRequest === requestId.current) setLoading(false);
     }
-  }, [searchTerm, selectedAuthors, selectedCategories]);
+  }, [rememberAuthors, searchTerm, selectedAuthors, selectedCategories]);
 
   const loadMoreBooks = useCallback(async () => {
     if (loadingMore || !hasMore || !nextCursor) return;
@@ -102,6 +119,7 @@ export function useBooksCatalog({
         cursor: nextCursor,
       });
       if (activeRequest !== requestId.current) return;
+      rememberAuthors(result.books);
       setBooks((previous) => {
         const existingIds = new Set(previous.map((book) => book.id));
         return [...previous, ...result.books.filter((book) => !existingIds.has(book.id))];
@@ -119,6 +137,7 @@ export function useBooksCatalog({
     hasMore,
     loadingMore,
     nextCursor,
+    rememberAuthors,
     searchTerm,
     selectedAuthors,
     selectedCategories,
@@ -162,37 +181,11 @@ export function useBooksCatalog({
     void checkApiHealth().then(setHealth);
   }, []);
 
-  useEffect(() => {
-    if (!filterMenuOpen) return;
-    let active = true;
-    setLoadingOptions(true);
-    setOptionsError(null);
-    const timer = setTimeout(() => {
-      getCatalogFacetsApi(authorSearch, selectedAuthors)
-        .then((facets) => {
-          if (!active) return;
-          setAvailableCategories(facets.categories);
-          setAvailableAuthors(facets.authors);
-          setAuthorLabels((previous) => ({
-            ...previous,
-            ...Object.fromEntries(facets.authors.map((author) => [author.value, author.label])),
-          }));
-        })
-        .catch(() => {
-          if (active) setOptionsError('No se pudieron cargar las opciones de filtros.');
-        })
-        .finally(() => {
-          if (active) setLoadingOptions(false);
-        });
-    }, 180);
-
-    return () => {
-      active = false;
-      clearTimeout(timer);
-    };
-  }, [authorSearch, filterMenuOpen, selectedAuthors]);
-
   const selectedFilterCount = selectedCategories.length + selectedAuthors.length;
+  const normalizedAuthorSearch = authorSearch.trim().toLocaleLowerCase('es');
+  const availableAuthors = knownAuthors.filter((author) =>
+    author.label.toLocaleLowerCase('es').includes(normalizedAuthorSearch)
+  );
 
   return {
     state: {
@@ -205,10 +198,8 @@ export function useBooksCatalog({
       authorLabels,
       authorSearch,
       filterMenuOpen,
-      availableCategories,
+      availableCategories: GENRES_LIST,
       availableAuthors,
-      loadingOptions,
-      optionsError,
       loading,
       loadingMore,
       health,

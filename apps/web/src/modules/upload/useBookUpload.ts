@@ -1,11 +1,9 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Book, BookGenre, MinerUScanResult } from '@babilon/shared-types';
-import { createBookApi, uploadBookPagesApi } from '@/services/api';
+import { createBookApi } from '@/services/api';
 import { mineruScannerService } from '@/services/mineru.service';
 import { splitTextIntoPages } from '@/lib/pageSplitter';
-import {
-  formatBookDocumentForUpload,
-} from '@/lib/bookTextCleaner';
+import { formatBookDocumentForUpload,} from '@/lib/bookTextCleaner';
 import type { StructuredBookDocument } from '@/lib/bookTextCleaner';
 import { cleanAndStructureBookDocumentAsync } from '@/lib/bookTextCleanerAsync';
 import { GENRES_LIST } from './bookUploadOptions';
@@ -14,7 +12,6 @@ export interface UseBookUploadOptions {
   onSuccess?: () => void;
 }
 
-const PAGE_UPLOAD_BATCH_SIZE = 50;
 type MinerUScanWithBookDraft = MinerUScanResult & {
   suggestedBookDraft?: Partial<Book>;
   coverUrl?: string;
@@ -27,6 +24,10 @@ function isHttpCoverUrl(value: string): boolean {
   } catch {
     return false;
   }
+}
+
+function generateBookIsbn(): string {
+  return `ISBN-BAB-${Date.now().toString().slice(-6)}`;
 }
 
 export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
@@ -77,6 +78,7 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
     }
 
     setUploadedFileName(file.name);
+    setIsbn(generateBookIsbn());
     setFullText('');
     setCleanedDocument(null);
     setScanResult(null);
@@ -127,7 +129,7 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
 
           if (detectedTitle) setTitle((current) => current.trim() || detectedTitle);
           if (detectedAuthor) setAuthor((current) => current.trim() || detectedAuthor);
-          if (detectedIsbn) setIsbn((current) => current.trim() || detectedIsbn);
+          if (detectedIsbn) setIsbn(detectedIsbn);
           if (detectedSynopsis) setSynopsis((current) => current.trim() || detectedSynopsis);
           if (detectedGenre && GENRES_LIST.includes(detectedGenre)) {
             setGenre((current) => current || detectedGenre);
@@ -156,6 +158,7 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
           setUploadTab('meta');
         } else {
           setUploadedFileName(null);
+          setIsbn('');
           setCleanedDocument(null);
           setFullText('');
           setStatusMessage({
@@ -165,6 +168,7 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
         }
       } catch (error: unknown) {
         setUploadedFileName(null);
+        setIsbn('');
         setCleanedDocument(null);
         setFullText('');
         setStatusMessage({
@@ -214,6 +218,7 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
           setUploadTab('meta');
         } catch (error: unknown) {
           setUploadedFileName(null);
+          setIsbn('');
           setCleanedDocument(null);
           setFullText('');
           setStatusMessage({
@@ -227,6 +232,7 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
         }
       } else {
         setUploadedFileName(null);
+        setIsbn('');
         setStatusMessage({
           type: 'error',
           text: 'El archivo no contiene texto legible.',
@@ -235,6 +241,7 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
     };
     reader.onerror = () => {
       setUploadedFileName(null);
+      setIsbn('');
       setStatusMessage({
         type: 'error',
         text: 'No se pudo leer el archivo seleccionado.',
@@ -259,6 +266,7 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
 
   const clearFile = () => {
     setUploadedFileName(null);
+    setIsbn('');
     setFullText('');
     setCleanedDocument(null);
     setScanResult(null);
@@ -317,15 +325,24 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
         return;
       }
 
-      const paginas = uploadText.trim()
-        ? splitTextIntoPages(uploadText).map((page) => ({
+      // Versión 2: respetar la estructura física que trae MinerU (page_idx) y no volver a dividir
+      // el texto por caracteres o por longitud. Solo se usa splitTextIntoPages cuando el contenido
+      // llega sin una paginación explícita (TXT/MD manual), donde no existe una fuente de verdad.
+      const paginas = scanResult?.paginas?.length
+        ? scanResult.paginas.map((page) => ({
             numero: page.numero,
             texto: page.texto,
-            conteo_palabras: page.conteo_palabras,
+            conteo_palabras: page.conteo_palabras ?? 0,
           }))
-        : [];
+        : uploadText.trim()
+          ? splitTextIntoPages(uploadText).map((page) => ({
+              numero: page.numero,
+              texto: page.texto,
+              conteo_palabras: page.conteo_palabras,
+            }))
+          : [];
 
-      const isbnVal = isbn.trim() || `ISBN-BAB-${Date.now().toString().slice(-6)}`;
+      const isbnVal = isbn.trim() || generateBookIsbn();
 
       const savedBook = await createBookApi({
         title: title.trim(),
@@ -337,38 +354,15 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
         synopsis: synopsis.trim() || 'Sin sinopsis registrada.',
         pageCount: paginas.length,
         coverUrl: coverUrl.trim() || undefined,
+        paginas,
       });
 
-      if (!savedBook.success || !savedBook.bookId) {
+      if (!savedBook.success) {
         setStatusMessage({
           type: 'error',
           text: savedBook.message || 'No se pudo guardar la obra en el catálogo.',
         });
         return;
-      }
-
-      const pagesToUpload = paginas;
-      for (let offset = 0; offset < pagesToUpload.length; offset += PAGE_UPLOAD_BATCH_SIZE) {
-        const batch = pagesToUpload.slice(offset, offset + PAGE_UPLOAD_BATCH_SIZE);
-        const isFinalBatch = offset + batch.length === pagesToUpload.length;
-        setStatusMessage({
-          type: 'info',
-          text: `Guardando páginas ${offset + 1}–${offset + batch.length} de ${pagesToUpload.length}...`,
-        });
-
-        const batchResult = await uploadBookPagesApi(
-          savedBook.bookId,
-          batch,
-          isFinalBatch,
-          pagesToUpload.length
-        );
-        if (!batchResult.success) {
-          setStatusMessage({
-            type: 'error',
-            text: batchResult.message || 'La obra quedó pendiente de completar su contenido.',
-          });
-          return;
-        }
       }
 
       setStatusMessage({
@@ -388,13 +382,6 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
     }
   };
 
-  const previewEstimatedPages = useMemo(() => {
-    const previewText = cleanedDocument?.body ?? fullText;
-    if (!previewText.trim()) return 0;
-    const pages = splitTextIntoPages(previewText);
-    return pages.length;
-  }, [cleanedDocument, fullText]);
-
   return {
     state: {
       uploadTab,
@@ -404,8 +391,6 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
       genre,
       year,
       publisher,
-      synopsis,
-      coverUrl,
       coverPreviewUrl: customCoverPreviewUrl || coverUrl || extractedCoverPreviewUrl,
       hasCustomCover: customCoverFile !== null,
       fullText,
@@ -415,18 +400,14 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
       scanResult,
       uploadedFileName,
       statusMessage,
-      previewEstimatedPages,
     },
     actions: {
       setUploadTab,
       setTitle,
       setAuthor,
-      setIsbn,
       setGenre,
       setYear,
       setPublisher,
-      setSynopsis,
-      setCoverUrl,
       selectCustomCover,
       removeCustomCover: () => setCustomCoverFile(null),
       setFullText: handleTextChange,

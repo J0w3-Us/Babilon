@@ -185,8 +185,6 @@ export function BibliotecaView() {
               authorLabels={catalog.authorLabels}
               authorSearch={catalog.authorSearch}
               activeCount={catalog.selectedFilterCount}
-              isLoadingOptions={catalog.loadingOptions}
-              optionsError={catalog.optionsError}
               onAuthorSearchChange={setAuthorSearch}
               onToggleCategory={toggleDraftCategory}
               onToggleAuthor={toggleDraftAuthor}

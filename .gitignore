@@ -12,3 +12,6 @@ coverage/
 pnpm-debug.log*
 .vercel
 .env*
+
+
+/scripts

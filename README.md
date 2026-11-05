@@ -80,10 +80,31 @@ El frontend expone un proxy interno que mantiene la clave fuera del navegador:
 | Método | Ruta | Uso |
 | ------ | --- | --- |
 | `GET` | `/api/backend/api/salud` | Estado de la API publicada |
-| `GET` | `/api/backend/api/libros` | Catálogo; admite `query`, `genre` y `featured` |
-| `POST` | `/api/backend/api/libros` | Registro de una obra |
+| `GET` | `/api/backend/api/libros` | Catálogo |
+| `GET` | `/api/backend/api/libros/{id}` | Detalle del libro y contenido de lectura; el cliente selecciona localmente bloques de 10 páginas |
+| `POST` | `/api/backend/api/libros` | Registro de metadatos y páginas de una obra en una solicitud |
+
+La carga envía las páginas dentro del `POST` de creación. No se utilizan rutas POST separadas por libro o por página, porque no forman parte del contrato soportado por la API publicada. El lector muestra las páginas en bloques locales de 10; el GET de detalle puede transferir el contenido completo.
 
 La API externa es la única responsable del acceso a datos. Las rutas locales directas de MongoDB ya no forman parte de `apps/web`.
+
+## Migración de portadas en MongoDB
+
+Si tienes documentos viejos con `portada` en formato no URL (base64, binario, etc.), normalízalos para que el frontend solo lea enlaces:
+
+```bash
+# 1) Simular cambios (no escribe)
+python scripts/normalize_cover_urls.py --uri "<MONGODB_URI>" --db biblioteca_digital --collection libros --dry-run
+
+# 2) Aplicar cambios reales
+python scripts/normalize_cover_urls.py --uri "<MONGODB_URI>" --db biblioteca_digital --collection libros --apply
+```
+
+La migración:
+- conserva solo URLs `http/https`,
+- unifica el valor en `portada_url` y `coverUrl`,
+- elimina el campo legado `portada`,
+- limpia campos de portada cuando no exista URL válida.
 
 ## Estructura
 

@@ -19,8 +19,9 @@ El estado y la consulta del catálogo viven en [useBooksCatalog.ts](../../apps/w
 - **Limpiar filtros** borra las selecciones del borrador; cerrar o cancelar descarta el borrador.
 - El contador del botón refleja las categorías y autores aplicados.
 - `q`, `category` y `author` se escriben en la URL. Al abrir la biblioteca, esos parámetros inicializan la búsqueda y los filtros.
-- Las opciones de autores y categorías se consultan al abrir el menú; la búsqueda de autores espera 180 ms.
-- El menú ofrece casillas, búsqueda de autores, estados de carga y error, cierre con `Escape` y foco de teclado.
+- Las categorías salen de la lista local `GENRES_LIST`. Los autores se acumulan desde los libros que el frontend recibe en las cargas iniciales y en **Cargar más**; la búsqueda de autores filtra esa lista en memoria.
+- El menú no consulta el endpoint de facetas. Las opciones de autor muestran solo autores conocidos por la sesión actual del catálogo; al cargar más obras se amplía esa lista.
+- El menú ofrece casillas, búsqueda local de autores, un estado vacío, cierre con `Escape` y foco de teclado.
 
 ### Carga incremental
 
@@ -35,8 +36,9 @@ La coordinación de páginas está en [useBookReader.ts](../../apps/web/src/modu
 ### Carga y navegación
 
 - El lector pide bloques de 10 páginas al avanzar a una página que aún no está cargada.
-- La consulta usa `GET /api/backend/api/libros/{id}/paginas?desde={n}&limite=10`.
-- Si esa ruta responde `404`, `getBookPagesApi` intenta obtener el libro mediante la ruta de detalle y extraer sus páginas. Si tampoco hay contenido utilizable, la UI presenta el error y permite reintentar.
+- La consulta usa `GET /api/backend/api/libros/{id}` y selecciona localmente las 10 páginas del bloque solicitado.
+- El límite de 10 páginas controla el bloque que conserva y muestra el lector; no reduce la respuesta transferida si el detalle contiene el libro completo.
+- Si el detalle no existe o no contiene páginas utilizables, la UI presenta el error y permite reintentar.
 - Al cambiar la página, el área desplazable del lector vuelve al inicio para que el nuevo texto comience visible desde arriba.
 
 ### Limpieza y representación del texto
@@ -78,9 +80,9 @@ El flujo se compone de [BookUploadWizard.tsx](../../apps/web/src/modules/upload/
 
 ### Persistencia del contenido
 
-El cliente valida y envía los metadatos mediante `createBookApi`. Después divide el texto preparado en páginas y las envía mediante `uploadBookPagesApi` en lotes de hasta 50. La interfaz informa el rango de páginas que se está guardando y detiene el flujo si un lote falla.
+El cliente valida los metadatos, divide el texto preparado en páginas y envía todo en una sola solicitud `POST /api/backend/api/libros`. El cuerpo contiene metadatos, `fullText`, `sampleChapterText` y `paginas`. No se hacen solicitudes POST adicionales por ID o por página, porque esas rutas no están soportadas por la API publicada.
 
-La división del texto se mantiene en [pageSplitter.ts](../../apps/web/src/lib/pageSplitter.ts). Los tamaños de lote y la lógica de la carga están en `useBookUpload.ts`; los nombres permitidos para género están en [bookUploadOptions.ts](../../apps/web/src/modules/upload/bookUploadOptions.ts).
+La división del texto se mantiene en [pageSplitter.ts](../../apps/web/src/lib/pageSplitter.ts). La creación y el envío conjunto de metadatos y páginas están en `useBookUpload.ts`; los nombres permitidos para género están en [bookUploadOptions.ts](../../apps/web/src/modules/upload/bookUploadOptions.ts).
 
 ## Mapa de módulos
 
@@ -94,7 +96,7 @@ La división del texto se mantiene en [pageSplitter.ts](../../apps/web/src/lib/p
 | Limpieza, división estructural y normalización | [bookTextCleaner.ts](../../apps/web/src/lib/bookTextCleaner.ts) |
 | Limpieza de documentos grandes en segundo plano | [bookTextCleanerAsync.ts](../../apps/web/src/lib/bookTextCleanerAsync.ts), [bookTextCleaner.worker.ts](../../apps/web/src/lib/bookTextCleaner.worker.ts) |
 | Conversión de texto en páginas | [pageSplitter.ts](../../apps/web/src/lib/pageSplitter.ts) |
-| Cliente de API, normalización y cargas por lotes | [api.ts](../../apps/web/src/services/api.ts), [bookMapper.ts](../../apps/web/src/lib/bookMapper.ts) |
+| Cliente de API, normalización y creación de obras | [api.ts](../../apps/web/src/services/api.ts), [bookMapper.ts](../../apps/web/src/lib/bookMapper.ts) |
 | Estado y componentes del flujo de carga | [useBookUpload.ts](../../apps/web/src/modules/upload/useBookUpload.ts), [BookUploadWizard.tsx](../../apps/web/src/modules/upload/BookUploadWizard.tsx) |
 
 ## Verificación antes de integrar
@@ -126,12 +128,13 @@ En `/subir`:
 - Confirmar que los metadatos detectados son editables y que los campos obligatorios se validan.
 - Revisar por separado cuerpo y material extra; comprobar la limpieza de paginación, encabezados, cortes de línea y guiones.
 - Probar una URL de portada válida y una inválida. Confirmar que una imagen elegida como vista previa local no se envía a la API.
-- Guardar una obra con varias páginas y verificar el progreso por lotes y el manejo de errores.
+- Guardar una obra con varias páginas y verificar que el POST de creación incluya los metadatos y el contenido.
 
 ## Diagnóstico rápido
 
-- **No aparecen filtros:** confirma que la API publicada exponga la consulta de facetas que consume `getCatalogFacetsApi`; la UI presenta el error sin sustituirlo por opciones falsas.
+- **No aparecen autores en los filtros:** carga obras en el catálogo, ya que las opciones locales se construyen a partir de los libros recibidos en la sesión.
 - **No cargan las páginas:** revisa la respuesta de la ruta de páginas y la alternativa de detalle en `getBookPagesApi`; el lector muestra un error recuperable.
+- **No se guardan las páginas:** confirma que la API externa desplegada acepte `paginas` y `fullText` en el cuerpo de `POST /api/libros`; el flujo actual no envía POST adicionales por ID.
 - **No funciona reanudar:** comprueba que el navegador permita `localStorage` y que el identificador de libro sea estable.
 - **Falla la limpieza de un archivo grande:** revisa el soporte de Web Workers y el mensaje de error del procesamiento; el flujo no debe continuar como si la limpieza hubiera terminado.
 - **La imagen personalizada no se guarda:** es una vista previa local por diseño; para persistir una portada se requiere proporcionar una URL válida.
