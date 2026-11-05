@@ -173,10 +173,7 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
           setTitle((current) => current.trim() || cleanName);
           setCleanedDocument(cleanedResult.structure);
           setFullText(formatBookDocumentForUpload(cleanedResult.structure));
-          if (!synopsis && bodyPages.length > 0) {
-            const firstPageClean = bodyPages[0].texto.slice(0, 260).trim();
-            setSynopsis(firstPageClean + (firstPageClean.length >= 260 ? '...' : ''));
-          }
+// Sinopsis se deja libre o se ingresa a mano si el texto plano no tiene sección explícita
           setStatusMessage({
             type: 'success',
             text: cleanedResult.structure.body

@@ -118,26 +118,13 @@ export function processMinerUOutput(input: ParseMinerUInput): MinerUScanResult {
   }
 
   // 5. Sinopsis sugerida
-  // Tomar los primeros párrafos largos del contenido (no encabezados, no título detectado)
-  // Excluir líneas que parezcan preguntas de examen / actividades académicas
+  // Se deja vacía por defecto para que el usuario la redacte a mano sin cortar texto del libro.
+  // Solo se extrae si existe explícitamente una sección rotulada como sinopsis/resumen.
   let suggestedSynopsis = '';
-  const ACADEMIC_SKIP = /^(pregunta\s*\d|bloque\s*\d|actividad\s*\d|ítem\s*\d|punto\s*\d|inciso\s*\d|sección\s*\d|parte\s*\d|@\w+)/i;
-  const paragraphs = contentLines.filter((l) => {
-    const c = cleanLine(l);
-    return (
-      !l.startsWith('#') &&
-      !l.startsWith('!') &&
-      c.length > 40 &&
-      c !== suggestedTitle &&
-      !/(?:autor|por|by|author)\s*[:\-]/i.test(c) &&
-      !ACADEMIC_SKIP.test(c) &&
-      !isSkippable(l)
-    );
-  });
-
-  if (paragraphs.length > 0) {
-    const excerpt = paragraphs.slice(0, 3).join(' ');
-    suggestedSynopsis = excerpt.length > 350 ? excerpt.slice(0, 347) + '...' : excerpt;
+  const explicitPattern = /(?:sinopsis|resumen|argumento)\s*[:\-]\s*([^\r\n]{30,500})/i;
+  const explicitMatch = markdown.match(explicitPattern);
+  if (explicitMatch && explicitMatch[1]) {
+    suggestedSynopsis = explicitMatch[1].trim();
   }
 
   return {
