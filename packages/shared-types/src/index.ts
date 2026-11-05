@@ -2,16 +2,36 @@ export type BookFormat = 'HARDCOVER' | 'PAPERBACK' | 'EBOOK' | 'AUDIOBOOK';
 
 export type BookGenre =
   | 'Ficción'
-  | 'No Ficción'
   | 'Ciencia Ficción'
-  | 'Fantasía'
-  | 'Filosofía'
-  | 'Historia'
-  | 'Misterio'
-  | 'Terror'
+  | 'Fantasía y Magia'
+  | 'Terror y Horror'
+  | 'Misterio y Suspenso'
+  | 'Aventura'
+  | 'Romance'
+  | 'Novela'
+  | 'Cuento'
   | 'Poesía'
+  | 'Ensayo'
+  | 'Biografía'
+  | 'Historia'
+  | 'Filosofía'
+  | 'Ciencia'
+  | 'Tecnología'
+  | 'Educación'
+  | 'Infantil y Juvenil'
+  | 'Cómic y Novela Gráfica'
+  | 'Arte y Fotografía'
+  | 'Cocina'
+  | 'Salud y Bienestar'
+  | 'Religión y Espiritualidad'
+  | 'Desarrollo Personal'
+  | 'Referencia y Consulta'
   | 'Clásicos'
-  | 'Desarrollo Personal';
+  | 'No Ficción'
+  | 'Fantasía'
+  | 'Terror'
+  | 'Misterio'
+  | 'Otro';
 
 export type ReadingStatus = 'WANT_TO_READ' | 'READING' | 'COMPLETED' | 'ABANDONED';
 
