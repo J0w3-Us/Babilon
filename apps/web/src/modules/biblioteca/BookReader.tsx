@@ -45,14 +45,29 @@ function renderTextoLibro(texto: string): JSX.Element[] {
     .filter(Boolean);
 
   const rendered: JSX.Element[] = [];
+  const regexMetadatos =
+    /\b(?:traductor(?:a)?|derechos morales|dominio p[uú]blico|isbn|t[ií]tulo original|editorial|copyright)\b|©/iu;
+  const regexNumeroSuelto = /^\d+\s+/u;
+  const regexEncabezado =
+    /^(?:#{1,6}\s*)?(cap[ií]tulo|pr[óo]logo)\s*([IVXLCDM\d]+)?\s*[:.-]?\s*/iu;
+  const regexPersonaje = /^[A-ZÁÉÍÓÚÑ\s]+(?:\([^)]+\))?:/u;
 
   for (let index = 0; index < parrafos.length; index += 1) {
-    const textoUnido = parrafos[index];
+    let textoUnido = parrafos[index];
     if (!textoUnido) continue;
 
-    const esTitulo =
-      textoUnido === 'GUÍA DEL LECTOR' ||
-      /^(?:CAP[IÍ]TULO\s+[IVXLCDM\d]+|PR[ÓO]LOGO(?:\s+[IVXLCDM\d]+)?)\b/iu.test(textoUnido);
+    if (regexNumeroSuelto.test(textoUnido)) {
+      textoUnido = textoUnido.replace(regexNumeroSuelto, '').trim();
+      if (!textoUnido || textoUnido.length < 50) continue;
+    }
+
+    // Los créditos suelen estar en bloques propios; "novela" sola también aparece
+    // en prosa narrativa, así que solo cuenta como metadato en una línea de portadilla.
+    const esAtribucionDeNovela =
+      /^(?:la\s+)?novela\b/iu.test(textoUnido) && textoUnido.length < 180;
+    if (regexMetadatos.test(textoUnido) || esAtribucionDeNovela) continue;
+
+    const esTitulo = textoUnido === 'GUÍA DEL LECTOR';
 
     if (esTitulo) {
       rendered.push(
@@ -63,11 +78,30 @@ function renderTextoLibro(texto: string): JSX.Element[] {
       continue;
     }
 
-    if (/^[A-ZÁÉÍÓÚÑ\s]+(?:\([^)]+\))?:/u.test(textoUnido)) {
+    const encabezado = textoUnido.match(regexEncabezado);
+    if (encabezado) {
+      const titulo = `${encabezado[1]}${encabezado[2] ? ` ${encabezado[2]}` : ''}`.toLocaleUpperCase('es');
+      const cuerpo = textoUnido.slice(encabezado[0].length).trim();
+      rendered.push(
+        <h3 key={`heading-${index}`} className="my-4 text-xl font-bold">
+          {titulo}
+        </h3>
+      );
+      if (cuerpo) {
+        rendered.push(
+          <p key={`chapter-body-${index}`} className="mb-3 text-justify">
+            {cuerpo}
+          </p>
+        );
+      }
+      continue;
+    }
+
+    if (regexPersonaje.test(textoUnido)) {
       const personajes: string[] = [textoUnido];
       while (index + 1 < parrafos.length) {
         const siguiente = parrafos[index + 1];
-        if (!siguiente || !/^[A-ZÁÉÍÓÚÑ\s]+(?:\([^)]+\))?:/u.test(siguiente)) break;
+        if (!siguiente || !regexPersonaje.test(siguiente)) break;
         personajes.push(siguiente);
         index += 1;
       }
