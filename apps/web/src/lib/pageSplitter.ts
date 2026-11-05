@@ -1,3 +1,5 @@
+import { stripPrintedPageNumbers } from './bookPageCleaner';
+
 /**
  * Utilitario unificado para dividir, estructurar y formatear texto en páginas reales.
  * Compatible con extracciones PDF (MinerU/unpdf), archivos Markdown y texto plano (.txt).
@@ -146,10 +148,11 @@ export function splitTextIntoPages(fullText: string): ParsedPage[] {
  * y espacios vacíos innecesarios.
  */
 function cleanPageContent(content: string): string {
-  return content
+  const withoutSeparators = content
     .replace(/^\s*#{1,3}\s*P[aá]gina\s*\d+\s*\n*/i, '')
     .replace(/^\s*---\s*P[aá]gina\s*\d+\s*---\s*\n*/i, '')
     .trim();
+  return stripPrintedPageNumbers(withoutSeparators);
 }
 
 /**

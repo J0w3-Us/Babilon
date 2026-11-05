@@ -12,6 +12,7 @@ coverage/
 pnpm-debug.log*
 .vercel
 .env*
+*.tsbuildinfo
 
 
 /scripts

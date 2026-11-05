@@ -1,3 +1,5 @@
+import { stripPrintedPageNumbers } from './bookPageCleaner';
+
 export interface BookTextMetadata {
   title?: string;
   author?: string;
@@ -255,7 +257,8 @@ export function sanitizeBookMarkdown(
         lines = removeRepeatedPageHeader(lines, metadata, inferredHeaderLines);
       }
       lines = repairBrokenInitialLetter(lines);
-      return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+      const chunkText = stripPrintedPageNumbers(lines.join('\n'), metadata);
+      return chunkText.replace(/\n{3,}/g, '\n\n').trim();
     })
     .filter(Boolean)
     .join('\n\n');

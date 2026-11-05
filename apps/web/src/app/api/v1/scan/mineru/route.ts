@@ -11,6 +11,7 @@ import {
   type BuiltBookPage,
   validatePaginasCoverage,
 } from '@/lib/buildPaginasFromMiddleJson';
+import { cleanAndFilterBookPages } from '@/lib/bookPageCleaner';
 import { processMinerUOutput } from '@/lib/mineruParser';
 import { formatPagesToDocument } from '@/lib/pageSplitter';
 
@@ -134,15 +135,15 @@ async function tryExtractWithPython(
 }
 
 function makeScanResult(
-  paginas: BuiltBookPage[],
+  rawPaginas: BuiltBookPage[],
   filename: string,
   metadata: Record<string, unknown> | undefined,
   startTime: number,
   warnings: string[] = []
 ): MinerUScanResult {
-  const markdown = formatPagesToDocument(paginas);
+  const fullMarkdown = formatPagesToDocument(rawPaginas);
   const parsed = processMinerUOutput({
-    markdown,
+    markdown: fullMarkdown,
     filename,
     metadata,
     processingTimeMs: Date.now() - startTime,
@@ -151,8 +152,27 @@ function makeScanResult(
     throw new Error('El parser de MinerU no generó los metadatos de extracción esperados.');
   }
 
+  const titleHint = (parsed.suggestedTitle || (typeof metadata?.title === 'string' ? metadata.title : undefined))?.trim();
+  const authorHint = (parsed.suggestedAuthor || (typeof metadata?.author === 'string' ? metadata.author : undefined))?.trim();
+
+  // Omitir preliminares (portada, índice, créditos, guía del lector) y folios impresos
+  const paginas = cleanAndFilterBookPages(rawPaginas, {
+    title: titleHint,
+    author: authorHint,
+  });
+
+  const omittedCount = rawPaginas.length - paginas.length;
+  if (omittedCount > 0) {
+    warnings.push(
+      `Se omitieron ${omittedCount} páginas preliminares (portada, índice y créditos). La lectura comienza en el inicio del libro.`
+    );
+  }
+
+  const cleanMarkdown = formatPagesToDocument(paginas);
+
   return {
     ...parsed,
+    rawMarkdown: cleanMarkdown,
     paginas,
     pages: paginas.map(({ numero, texto }) => ({ pageNumber: numero, markdown: texto })),
     pageCount: paginas.length,
@@ -240,13 +260,14 @@ export async function POST(request: NextRequest) {
                   paginas.reduce((sum, page) => sum + page.conteo_palabras, 0)
                 );
                 warnings.push(...validation.warnings);
+                const scanData = makeScanResult(paginas, filename, metadata, startTime, warnings);
                 return NextResponse.json({
                   success: true,
-                  data: makeScanResult(paginas, filename, metadata, startTime, warnings),
+                  data: scanData,
                   engine: 'mineru-remote-middle-json',
                   stats: {
                     totalPages: expectedPageCount,
-                    extractedSections: paginas.length,
+                    extractedSections: scanData.paginas?.length ?? 0,
                   },
                 });
               } catch (error) {
@@ -304,19 +325,20 @@ export async function POST(request: NextRequest) {
           paginas.reduce((sum, page) => sum + page.conteo_palabras, 0)
         );
         warnings.push(...validation.warnings);
+        const scanData = makeScanResult(
+          paginas,
+          filename,
+          { title: pythonResult.title, author: pythonResult.author },
+          startTime,
+          warnings
+        );
         return NextResponse.json({
           success: true,
-          data: makeScanResult(
-            paginas,
-            filename,
-            { title: pythonResult.title, author: pythonResult.author },
-            startTime,
-            warnings
-          ),
+          data: scanData,
           engine: pythonResult.engine || 'mineru-local-middle-json',
           stats: {
             totalPages: expectedPageCount,
-            extractedSections: paginas.length,
+            extractedSections: scanData.paginas?.length ?? 0,
           },
         });
       } catch (error) {
@@ -345,19 +367,20 @@ export async function POST(request: NextRequest) {
           paginas.reduce((sum, page) => sum + page.conteo_palabras, 0)
         );
         warnings.push(...validation.warnings);
+        const scanData = makeScanResult(
+          paginas,
+          filename,
+          { title: pythonResult.title, author: pythonResult.author },
+          startTime,
+          warnings
+        );
         return NextResponse.json({
           success: true,
-          data: makeScanResult(
-            paginas,
-            filename,
-            { title: pythonResult.title, author: pythonResult.author },
-            startTime,
-            warnings
-          ),
+          data: scanData,
           engine: pythonResult.engine || 'mineru-local-python',
           stats: {
             totalPages: expectedPageCount,
-            extractedSections: paginas.length,
+            extractedSections: scanData.paginas?.length ?? 0,
           },
         });
       } catch (error) {
@@ -373,19 +396,20 @@ export async function POST(request: NextRequest) {
       unpdfResult.paginas.reduce((sum, page) => sum + page.conteo_palabras, 0)
     );
     warnings.push(...validation.warnings);
+    const scanData = makeScanResult(
+      unpdfResult.paginas,
+      filename,
+      { title: unpdfResult.title, author: unpdfResult.author },
+      startTime,
+      warnings
+    );
     return NextResponse.json({
       success: true,
-      data: makeScanResult(
-        unpdfResult.paginas,
-        filename,
-        { title: unpdfResult.title, author: unpdfResult.author },
-        startTime,
-        warnings
-      ),
+      data: scanData,
       engine: 'babilon-native-engine',
       stats: {
         totalPages: expectedPageCount,
-        extractedSections: unpdfResult.paginas.length,
+        extractedSections: scanData.paginas?.length ?? 0,
       },
     });
   } catch (error: unknown) {

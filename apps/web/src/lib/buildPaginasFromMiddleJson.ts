@@ -1,3 +1,5 @@
+import { stripPrintedPageNumbers } from './bookPageCleaner';
+
 export interface BuiltBookPage {
   numero: number;
   texto: string;
@@ -340,7 +342,7 @@ export function buildPaginasFromMiddleJson(
     }
 
     flushPendingText();
-    const texto = textBlocks.join('\n\n').trim();
+    const texto = stripPrintedPageNumbers(textBlocks.join('\n\n').trim());
     return {
       numero: pageIndex + 1,
       texto,
@@ -409,7 +411,7 @@ export function buildPaginasFromPageTexts(
         );
       })
       .join('\n');
-    const texto = normalizeLines(textWithoutPageFurniture);
+    const texto = stripPrintedPageNumbers(normalizeLines(textWithoutPageFurniture));
     return {
       numero: page.pageNumber,
       texto,

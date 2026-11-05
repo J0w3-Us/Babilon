@@ -3,6 +3,7 @@ import { Book, BookGenre, MinerUScanResult } from '@babilon/shared-types';
 import { createBookApi } from '@/services/api';
 import { mineruScannerService } from '@/services/mineru.service';
 import { parseSeparatedPages, splitTextIntoPages } from '@/lib/pageSplitter';
+import { cleanAndFilterBookPages } from '@/lib/bookPageCleaner';
 import { formatBookDocumentForUpload,} from '@/lib/bookTextCleaner';
 import type { StructuredBookDocument } from '@/lib/bookTextCleaner';
 import { cleanAndStructureBookDocumentAsync } from '@/lib/bookTextCleanerAsync';
@@ -276,8 +277,8 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
         return;
       }
 
-      // Las páginas de MinerU ya son la fuente física; el texto editado no debe sobrescribirlas.
-      const paginas = scanResult?.paginas?.length
+      // Filtrar páginas preliminares (índice, créditos) y remover folios impresos
+      const rawPaginas = scanResult?.paginas?.length
         ? scanResult.paginas
         : uploadText.trim()
           ? parseSeparatedPages(uploadText) ?? [{
@@ -286,6 +287,11 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
               conteo_palabras: uploadText.trim().split(/\s+/u).filter(Boolean).length,
             }]
           : [];
+
+      const paginas = cleanAndFilterBookPages(rawPaginas, {
+        title: title.trim(),
+        author: author.trim(),
+      });
 
       const isbnVal = isbn.trim() || generateBookIsbn();
 
