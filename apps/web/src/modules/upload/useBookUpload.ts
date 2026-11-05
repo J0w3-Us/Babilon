@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Book, BookGenre, MinerUScanResult } from '@babilon/shared-types';
 import { createBookApi } from '@/services/api';
 import { mineruScannerService } from '@/services/mineru.service';
-import { splitTextIntoPages } from '@/lib/pageSplitter';
+import { parseSeparatedPages, splitTextIntoPages } from '@/lib/pageSplitter';
 import { formatBookDocumentForUpload,} from '@/lib/bookTextCleaner';
 import type { StructuredBookDocument } from '@/lib/bookTextCleaner';
 import { cleanAndStructureBookDocumentAsync } from '@/lib/bookTextCleanerAsync';
@@ -14,17 +14,7 @@ export interface UseBookUploadOptions {
 
 type MinerUScanWithBookDraft = MinerUScanResult & {
   suggestedBookDraft?: Partial<Book>;
-  coverUrl?: string;
 };
-
-function isHttpCoverUrl(value: string): boolean {
-  try {
-    const protocol = new URL(value).protocol;
-    return protocol === 'http:' || protocol === 'https:';
-  } catch {
-    return false;
-  }
-}
 
 function generateBookIsbn(): string {
   return `ISBN-BAB-${Date.now().toString().slice(-6)}`;
@@ -39,10 +29,6 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
   const [year, setYear] = useState<number | ''>('');
   const [publisher, setPublisher] = useState('Editorial Babilon');
   const [synopsis, setSynopsis] = useState('');
-  const [coverUrl, setCoverUrl] = useState('');
-  const [extractedCoverPreviewUrl, setExtractedCoverPreviewUrl] = useState('');
-  const [customCoverFile, setCustomCoverFile] = useState<File | null>(null);
-  const [customCoverPreviewUrl, setCustomCoverPreviewUrl] = useState('');
   const [fullText, setFullText] = useState('');
   const [cleanedDocument, setCleanedDocument] = useState<StructuredBookDocument | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -53,17 +39,6 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
     type: 'success' | 'error' | 'info';
     text: string;
   } | null>(null);
-
-  useEffect(() => {
-    if (!customCoverFile) {
-      setCustomCoverPreviewUrl('');
-      return;
-    }
-
-    const previewUrl = URL.createObjectURL(customCoverFile);
-    setCustomCoverPreviewUrl(previewUrl);
-    return () => URL.revokeObjectURL(previewUrl);
-  }, [customCoverFile]);
 
   const handleFileUpload = async (file: File) => {
     const isPdf = file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf';
@@ -82,7 +57,6 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
     setFullText('');
     setCleanedDocument(null);
     setScanResult(null);
-    setExtractedCoverPreviewUrl('');
 
     if (isPdf) {
       setIsScanning(true);
@@ -104,7 +78,6 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
           const detectedSynopsis = scan.suggestedSynopsis || draft?.synopsis || extractedMetadata?.synopsis;
           const detectedGenre = draft?.genres?.[0] || extractedMetadata?.genres?.[0];
           const detectedYear = draft?.publishedYear ?? extractedMetadata?.publishedYear;
-          const detectedCover = draft?.coverUrl || scanWithBookDraft.coverUrl;
           const sourceMarkdown = scan.pages?.length
             ? [...scan.pages]
                 .sort((left, right) => left.pageNumber - right.pageNumber)
@@ -136,11 +109,6 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
           }
           if (typeof detectedYear === 'number' && Number.isInteger(detectedYear)) {
             setYear((current) => current === '' ? detectedYear : current);
-          }
-          if (detectedCover?.startsWith('data:image/')) {
-            setExtractedCoverPreviewUrl(detectedCover);
-          } else if (detectedCover && isHttpCoverUrl(detectedCover)) {
-            setCoverUrl((current) => current.trim() || detectedCover);
           }
           const detectedPublisher = draft?.publisher;
           if (detectedPublisher) {
@@ -250,33 +218,19 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
     reader.readAsText(file);
   };
 
-  const selectCustomCover = (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      setStatusMessage({ type: 'error', text: 'Selecciona un archivo de imagen válido.' });
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      setStatusMessage({ type: 'error', text: 'La imagen de portada debe pesar menos de 5 MB.' });
-      return;
-    }
-
-    setCustomCoverFile(file);
-    setStatusMessage(null);
-  };
-
   const clearFile = () => {
     setUploadedFileName(null);
     setIsbn('');
     setFullText('');
     setCleanedDocument(null);
     setScanResult(null);
-    setExtractedCoverPreviewUrl('');
     setStatusMessage(null);
   };
 
   const handleTextChange = (text: string) => {
     setFullText(text);
     setCleanedDocument(null);
+    setScanResult(null);
   };
 
   const submitBook = async () => {
@@ -325,21 +279,15 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
         return;
       }
 
-      // Versión 2: respetar la estructura física que trae MinerU (page_idx) y no volver a dividir
-      // el texto por caracteres o por longitud. Solo se usa splitTextIntoPages cuando el contenido
-      // llega sin una paginación explícita (TXT/MD manual), donde no existe una fuente de verdad.
+      // Las páginas de MinerU ya son la fuente física; el texto editado no debe sobrescribirlas.
       const paginas = scanResult?.paginas?.length
-        ? scanResult.paginas.map((page) => ({
-            numero: page.numero,
-            texto: page.texto,
-            conteo_palabras: page.conteo_palabras ?? 0,
-          }))
+        ? scanResult.paginas
         : uploadText.trim()
-          ? splitTextIntoPages(uploadText).map((page) => ({
-              numero: page.numero,
-              texto: page.texto,
-              conteo_palabras: page.conteo_palabras,
-            }))
+          ? parseSeparatedPages(uploadText) ?? [{
+              numero: 1,
+              texto: uploadText.trim(),
+              conteo_palabras: uploadText.trim().split(/\s+/u).filter(Boolean).length,
+            }]
           : [];
 
       const isbnVal = isbn.trim() || generateBookIsbn();
@@ -353,7 +301,6 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
         publisher: publisher.trim() || 'Editorial Babilon',
         synopsis: synopsis.trim() || 'Sin sinopsis registrada.',
         pageCount: paginas.length,
-        coverUrl: coverUrl.trim() || undefined,
         paginas,
       });
 
@@ -391,8 +338,6 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
       genre,
       year,
       publisher,
-      coverPreviewUrl: customCoverPreviewUrl || coverUrl || extractedCoverPreviewUrl,
-      hasCustomCover: customCoverFile !== null,
       fullText,
       cleanedDocument,
       isSubmitting,
@@ -408,8 +353,6 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
       setGenre,
       setYear,
       setPublisher,
-      selectCustomCover,
-      removeCustomCover: () => setCustomCoverFile(null),
       setFullText: handleTextChange,
       handleFileUpload,
       submitBook,

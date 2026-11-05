@@ -1,6 +1,5 @@
 'use client';
 
-import { ImagePlus } from 'lucide-react';
 import { BookGenre } from '@babilon/shared-types';
 import { GENRES_LIST } from './bookUploadOptions';
 
@@ -16,10 +15,6 @@ interface MetadataFieldsProps {
   onYearChange: (value: number | '') => void;
   publisher: string;
   onPublisherChange: (value: string) => void;
-  coverPreviewUrl: string;
-  hasCustomCover: boolean;
-  onCoverFileSelect: (file: File) => void;
-  onRemoveCustomCover: () => void;
 }
 
 export function MetadataFields({
@@ -34,10 +29,6 @@ export function MetadataFields({
   onYearChange,
   publisher,
   onPublisherChange,
-  coverPreviewUrl,
-  hasCustomCover,
-  onCoverFileSelect,
-  onRemoveCustomCover,
 }: MetadataFieldsProps) {
   const inputBaseClasses =
     'w-full rounded-xl border border-stone-200/90 bg-cream-100 px-3.5 py-2.5 text-sm text-stone-900 transition-all placeholder:text-stone-400 focus:border-terracotta-300/70 focus:bg-cream-50 focus:outline-none focus:ring-2 focus:ring-terracotta-100/40 dark:border-surface-300 dark:bg-surface-200 dark:text-stone-100 dark:focus:border-surface-400 dark:focus:bg-surface-100 dark:focus:ring-surface-400/20';
@@ -165,55 +156,6 @@ export function MetadataFields({
         </div>
       </section>
 
-      <section aria-labelledby="book-cover-label">
-        <p
-          id="book-cover-label"
-          className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-stone-700 dark:text-stone-300"
-        >
-          Portada (opcional)
-        </p>
-        <div className="flex flex-wrap items-center gap-3">
-          {coverPreviewUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={coverPreviewUrl}
-              alt="Vista previa de la portada"
-              className="h-28 w-20 rounded-lg border border-stone-200 object-cover dark:border-surface-300"
-            />
-          )}
-          <div className="flex flex-col items-start gap-2">
-            <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border border-stone-200 px-3 text-xs font-semibold text-stone-700 transition-colors hover:bg-cream-100 focus-within:outline focus-within:outline-2 focus-within:outline-terracotta-600 dark:border-surface-300 dark:text-stone-200 dark:hover:bg-surface-200">
-              <ImagePlus size={14} />
-              Seleccionar portada
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  if (file) onCoverFileSelect(file);
-                  event.target.value = '';
-                }}
-                className="sr-only"
-                aria-label="Seleccionar portada"
-              />
-            </label>
-            {hasCustomCover && (
-              <>
-                <p className="text-xs text-stone-500 dark:text-stone-400">
-                  Vista previa local; la imagen no se enviará a la API.
-                </p>
-                <button
-                  type="button"
-                  onClick={onRemoveCustomCover}
-                  className="text-xs font-semibold text-terracotta-700 underline underline-offset-2 dark:text-terracotta-300"
-                >
-                  Quitar portada seleccionada
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      </section>
     </div>
   );
 }

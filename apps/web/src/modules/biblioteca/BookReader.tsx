@@ -37,6 +37,63 @@ interface BookReaderProps {
   isLoadingPages?: boolean;
 }
 
+function renderTextoLibro(texto: string): JSX.Element[] {
+  const parrafos = texto
+    .replace(/\r\n?/gu, '\n')
+    .split(/\n{2,}/u)
+    .map((parrafo) => parrafo.replace(/\n/gu, ' ').trim())
+    .filter(Boolean);
+
+  const rendered: JSX.Element[] = [];
+
+  for (let index = 0; index < parrafos.length; index += 1) {
+    const textoUnido = parrafos[index];
+    if (!textoUnido) continue;
+
+    const esTitulo =
+      textoUnido === 'GUÍA DEL LECTOR' ||
+      /^(?:CAP[IÍ]TULO\s+[IVXLCDM\d]+|PR[ÓO]LOGO(?:\s+[IVXLCDM\d]+)?)\b/iu.test(textoUnido);
+
+    if (esTitulo) {
+      rendered.push(
+        <h3 key={`heading-${index}`} className="my-4 text-xl font-bold">
+          {textoUnido}
+        </h3>
+      );
+      continue;
+    }
+
+    if (/^[A-ZÁÉÍÓÚÑ\s]+(?:\([^)]+\))?:/u.test(textoUnido)) {
+      const personajes: string[] = [textoUnido];
+      while (index + 1 < parrafos.length) {
+        const siguiente = parrafos[index + 1];
+        if (!siguiente || !/^[A-ZÁÉÍÓÚÑ\s]+(?:\([^)]+\))?:/u.test(siguiente)) break;
+        personajes.push(siguiente);
+        index += 1;
+      }
+
+      rendered.push(
+        <ul key={`characters-${index}`} className="mb-3 list-none space-y-2 pl-4">
+          {personajes.map((personaje, characterIndex) => (
+            <li key={`${characterIndex}-${personaje}`} className="text-justify">
+              {personaje}
+            </li>
+          ))}
+        </ul>
+      );
+      continue;
+    }
+
+    rendered.push(
+      <p key={`paragraph-${index}`} className="mb-3 text-justify">
+        {textoUnido}
+      </p>
+    );
+  }
+
+  return rendered;
+}
+
 export function BookReader({
   book,
   page,
@@ -265,9 +322,9 @@ export function BookReader({
             ) : (
               <div
                 style={{ fontSize: `${fontSize}px` }}
-                className="font-serif leading-normal whitespace-pre-line text-justify"
+                className="font-serif leading-normal"
               >
-                {pageCount === 0 ? currentPageData.texto : (page?.texto ?? '')}
+                {renderTextoLibro(pageCount === 0 ? currentPageData.texto : (page?.texto ?? ''))}
               </div>
             )}
           </div>

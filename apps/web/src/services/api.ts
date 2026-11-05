@@ -1,5 +1,5 @@
 import { Book, BookGenre, BookPage, MinerUScanResult } from '@babilon/shared-types';
-import { normalizeBook, normalizeCoverUrl } from '@/lib/bookMapper';
+import { normalizeBook } from '@/lib/bookMapper';
 import { splitTextIntoPages } from '@/lib/pageSplitter';
 
 export interface HealthInfo {
@@ -208,17 +208,8 @@ export async function createBookApi(book: {
   publishedYear: number;
   publisher: string;
   pageCount: number;
-  coverUrl?: string;
   paginas?: BookPage[];
 }): Promise<{ success: boolean; bookId?: string; message?: string }> {
-  const coverUrl = book.coverUrl ? normalizeCoverUrl(book.coverUrl) : undefined;
-  if (book.coverUrl && !coverUrl) {
-    return {
-      success: false,
-      message: 'La portada debe ser una URL válida con protocolo http o https.',
-    };
-  }
-
   const { data } = await apiFetch<unknown>('/api/backend/api/libros', {
     method: 'POST',
     body: JSON.stringify({
@@ -230,9 +221,6 @@ export async function createBookApi(book: {
       categorias: book.genres,
       sinopsis: book.synopsis,
       pageCount: book.pageCount,
-      // La portada se almacena como URL; nunca se envían archivos ni imágenes embebidas.
-      portada_url: coverUrl,
-      coverUrl,
       paginas: book.paginas,
     }),
   });

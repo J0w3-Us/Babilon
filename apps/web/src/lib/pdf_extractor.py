@@ -34,6 +34,8 @@ def extract_with_mineru_cli(pdf_path, output_dir):
         "middle_json",
         "--pages",
         "all",
+        "--ocr-mode",
+        "auto",
     ]
 
     try:

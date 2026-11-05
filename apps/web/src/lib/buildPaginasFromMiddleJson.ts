@@ -35,7 +35,7 @@ const TITLE_BLOCK_TYPES = new Set([
   'heading',
 ]);
 
-const TERMINAL_PUNCTUATION = /[.!?。！？—]\s*$/u;
+const TERMINAL_PUNCTUATION = /[.!?。！？—]["'”’»)\]}]*\s*$/u;
 const STRUCTURAL_LINE = /^(?:[-*+]\s|•\s|\d+[.)]\s|—\s|>\s|#{1,6}\s)/u;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -105,11 +105,37 @@ function countWords(text: string): number {
 }
 
 function imageReference(block: Record<string, unknown>): string {
-  const candidates = [block.image_path, block.imagePath, block.path, block.url];
+  const content = isRecord(block.content) ? block.content : undefined;
+  const imageSource = isRecord(block.image_source) ? block.image_source : undefined;
+  const contentImageSource =
+    content && isRecord(content.image_source) ? content.image_source : undefined;
+  const candidates = [
+    block.image_path,
+    block.imagePath,
+    block.img_path,
+    block.path,
+    block.url,
+    imageSource?.path,
+    contentImageSource?.path,
+  ];
   const path = candidates.find((candidate): candidate is string =>
     typeof candidate === 'string' && candidate.trim().length > 0
   );
-  return path ? `[Imagen: ${path.trim()}]` : '';
+  const captions = [
+    extractText(block.content),
+    block.image_caption,
+    block.image_footnote,
+    block.caption,
+    content?.image_caption,
+    content?.image_footnote,
+  ]
+    .map(extractText)
+    .map((text) => text.trim())
+    .filter(Boolean)
+    .filter((text, index, all) => all.indexOf(text) === index);
+
+  const reference = path ? `[Imagen: ${path.trim()}]` : '[Imagen]';
+  return captions.length > 0 ? `${reference}\n${captions.join(' ')}` : reference;
 }
 
 function parseMiddleJson(input: unknown): Record<string, unknown> {
@@ -263,19 +289,57 @@ export function buildPaginasFromMiddleJson(
       });
 
     const textBlocks: string[] = [];
+    let pendingText = '';
+    const flushPendingText = () => {
+      if (pendingText) textBlocks.push(pendingText);
+      pendingText = '';
+    };
+
     for (const { block } of blocks) {
       if (!isRecord(block)) continue;
       const type = typeof block.type === 'string' ? block.type.toLowerCase() : '';
+
+      // Repeated page furniture is layout metadata, not part of the book's narrative.
       if (IGNORED_BLOCK_TYPES.has(type)) continue;
 
-      const text = normalizeLines(extractText(block.content)) || imageReference(block);
+      if (type === 'text') {
+        const paragraphs = normalizeLines(extractText(block.content))
+          .split(/\n{2,}/u)
+          .filter(Boolean);
+
+        paragraphs.forEach((paragraph, paragraphIndex) => {
+          if (paragraphIndex > 0) flushPendingText();
+          if (pendingText && TERMINAL_PUNCTUATION.test(pendingText)) flushPendingText();
+
+          if (!pendingText) {
+            pendingText = paragraph;
+          } else if (/-$/u.test(pendingText) && /^[a-záéíóúüñ]/iu.test(paragraph)) {
+            pendingText = `${pendingText.slice(0, -1)}${paragraph}`;
+          } else {
+            // MinerU can split a sentence across adjacent layout blocks; join it until punctuation.
+            pendingText = `${pendingText} ${paragraph}`;
+          }
+
+          if (TERMINAL_PUNCTUATION.test(pendingText)) flushPendingText();
+        });
+        continue;
+      }
+
+      flushPendingText();
+      const text =
+        type === 'image'
+          ? imageReference(block)
+          : normalizeLines(extractText(block.content)) || imageReference(block);
       if (!text) continue;
 
-      textBlocks.push(TITLE_BLOCK_TYPES.has(type) && !/^#{1,6}\s/u.test(text)
-        ? `## ${text}`
-        : text);
+      textBlocks.push(
+        TITLE_BLOCK_TYPES.has(type) && !/^#{1,6}\s/u.test(text)
+          ? `## ${text}`
+          : text
+      );
     }
 
+    flushPendingText();
     const texto = textBlocks.join('\n\n').trim();
     return {
       numero: pageIndex + 1,
@@ -300,6 +364,25 @@ export function buildPaginasFromPageTexts(
     );
   }
 
+  const repeatedEdgeLines = new Map<string, number>();
+  const edgeLinesByPage = pages.map(({ text }) => {
+    const nonEmptyLines = text
+      .replace(/\r\n?/gu, '\n')
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
+    const edgeLines = new Set([
+      ...nonEmptyLines.slice(0, 3),
+      ...nonEmptyLines.slice(-3),
+    ]);
+
+    for (const line of edgeLines) {
+      repeatedEdgeLines.set(line, (repeatedEdgeLines.get(line) ?? 0) + 1);
+    }
+
+    return edgeLines;
+  });
+
   return pages.map((page, index) => {
     if (page.pageNumber !== index + 1) {
       throw new Error(
@@ -307,7 +390,26 @@ export function buildPaginasFromPageTexts(
       );
     }
 
-    const texto = normalizeLines(page.text);
+    const edgeLines = edgeLinesByPage[index];
+    if (!edgeLines) {
+      throw new Error(`No se pudo inspeccionar el texto de la página ${page.pageNumber}.`);
+    }
+
+    // El fallback de texto plano no incluye tipos semánticos; solo elimina folios
+    // y líneas repetidas en los bordes, donde suelen imprimirse encabezados y pies.
+    const textWithoutPageFurniture = page.text
+      .replace(/\r\n?/gu, '\n')
+      .split('\n')
+      .filter((line) => {
+        const normalizedLine = line.trim();
+        if (/^p[aá]gina\s+\d+(?:\s+de\s+\d+)?$/iu.test(normalizedLine)) return false;
+        return !(
+          edgeLines.has(normalizedLine) &&
+          (repeatedEdgeLines.get(normalizedLine) ?? 0) >= 3
+        );
+      })
+      .join('\n');
+    const texto = normalizeLines(textWithoutPageFurniture);
     return {
       numero: page.pageNumber,
       texto,

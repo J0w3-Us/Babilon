@@ -12,13 +12,55 @@ export interface ParsedPage {
 export const PAGE_SEPARATOR = (pageNum: number) => `--- Página ${pageNum} ---`;
 const MAX_PAGE_CHARACTERS = 3500;
 
+function countWords(str: string): number {
+  return str.trim() ? str.trim().split(/\s+/).length : 0;
+}
+
+function toParsedPage(numero: number, content: string): ParsedPage {
+  const texto = cleanPageContent(content);
+  return { numero, texto, conteo_palabras: countWords(texto) };
+}
+
+/**
+ * Parses explicit page boundaries without subdividing a physical page by character count.
+ * Returns null when the document contains no recognized page separators.
+ */
+export function parseSeparatedPages(fullText: string): ParsedPage[] | null {
+  const trimmed = fullText.trim();
+  if (!trimmed) return null;
+
+  const numberedSeparator =
+    /(?:^|\r?\n)[ \t]*(?:---[ \t]*P[aá]gina[ \t]*(\d+)[ \t]*---|#{1,3}[ \t]*P[aá]gina[ \t]*(\d+))[ \t]*(?=\r?\n|$)/gi;
+  const numberedMatches = Array.from(trimmed.matchAll(numberedSeparator));
+
+  if (numberedMatches.length > 0) {
+    return numberedMatches.map((match, index) => {
+      const start = (match.index ?? 0) + match[0].length;
+      const end = numberedMatches[index + 1]?.index ?? trimmed.length;
+      const pageNumber = Number(match[1] ?? match[2]);
+      return toParsedPage(Number.isSafeInteger(pageNumber) && pageNumber > 0 ? pageNumber : index + 1,
+        trimmed.slice(start, end));
+    });
+  }
+
+  const horizontalSeparator = /(?:^|\r?\n)[ \t]*(?:---|[*]{3,})[ \t]*(?=\r?\n|$)/g;
+  const horizontalMatches = Array.from(trimmed.matchAll(horizontalSeparator));
+  if (horizontalMatches.length === 0) return null;
+
+  return horizontalMatches.map((match, index) => {
+    const start = (match.index ?? 0) + match[0].length;
+    const end = horizontalMatches[index + 1]?.index ?? trimmed.length;
+    return toParsedPage(index + 1, trimmed.slice(start, end));
+  });
+}
+
 /**
  * Divide un texto continuo o con separadores en un array de páginas limpias y legibles.
  * Detecta:
  * - Separadores estándar: `--- Página X ---`
  * - Separadores Markdown: `---` o `***`
  * - Encabezados de página: `## Página X` o `# Página X`
- * - Si no contiene separadores y excede 2000 caracteres, divide inteligentemente por párrafos.
+ * - Solo divide texto sin separadores por párrafos cuando excede 2000 caracteres.
  */
 export function splitTextIntoPages(fullText: string): ParsedPage[] {
   if (!fullText || !fullText.trim()) {
@@ -26,45 +68,8 @@ export function splitTextIntoPages(fullText: string): ParsedPage[] {
   }
 
   const trimmed = fullText.trim();
-
-  // 1. Detectar patrón explícito "--- Página N ---"
-  const formalPattern = /(?:^|\n)\s*---\s*P[aá]gina\s*(\d+)\s*---\s*(?:\n|$)/gi;
-  if (formalPattern.test(trimmed)) {
-    const rawParts = trimmed.split(/(?:^|\n)\s*---\s*P[aá]gina\s*\d+\s*---\s*(?:\n|$)/gi);
-    const pages = rawParts
-      .map((p) => cleanPageContent(p))
-      .filter((p) => p.length > 0)
-      .flatMap(splitLongPage)
-      .map((texto, idx) => ({ numero: idx + 1, texto, conteo_palabras: countWords(texto) }));
-
-    if (pages.length > 0) return pages;
-  }
-
-  // 2. Detectar encabezados "## Página N" o "# Página N"
-  const headerPattern = /(?:^|\n)\s*#{1,3}\s*P[aá]gina\s*\d+\s*(?:\n|$)/gi;
-  if (headerPattern.test(trimmed)) {
-    const rawParts = trimmed.split(/(?:^|\n)\s*#{1,3}\s*P[aá]gina\s*\d+\s*(?:\n|$)/gi);
-    const pages = rawParts
-      .map((p) => cleanPageContent(p))
-      .filter((p) => p.length > 0)
-      .flatMap(splitLongPage)
-      .map((texto, idx) => ({ numero: idx + 1, texto, conteo_palabras: countWords(texto) }));
-
-    if (pages.length > 0) return pages;
-  }
-
-  // 3. Detectar divisores horizontales de Markdown: `\n---\n` o `\n***\n`
-  const mdHrPattern = /(?:^|\n)\s*(?:---|[*]{3,})\s*(?:\n|$)/g;
-  if (mdHrPattern.test(trimmed)) {
-    const rawParts = trimmed.split(/(?:^|\n)\s*(?:---|[*]{3,})\s*(?:\n|$)/g);
-    const pages = rawParts
-      .map((p) => cleanPageContent(p))
-      .filter((p) => p.length > 0)
-      .flatMap(splitLongPage)
-      .map((texto, idx) => ({ numero: idx + 1, texto, conteo_palabras: countWords(texto) }));
-
-    if (pages.length > 0) return pages;
-  }
+  const separatedPages = parseSeparatedPages(trimmed);
+  if (separatedPages) return separatedPages;
 
   // 4. Si es un texto largo continuo sin marcas (> 1800 caracteres), dividir naturalmente por párrafos
   if (trimmed.length > 2000) {
@@ -145,10 +150,6 @@ function cleanPageContent(content: string): string {
     .replace(/^\s*#{1,3}\s*P[aá]gina\s*\d+\s*\n*/i, '')
     .replace(/^\s*---\s*P[aá]gina\s*\d+\s*---\s*\n*/i, '')
     .trim();
-}
-
-function countWords(str: string): number {
-  return str.trim() ? str.trim().split(/\s+/).length : 0;
 }
 
 /**

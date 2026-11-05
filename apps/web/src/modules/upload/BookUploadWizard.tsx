@@ -31,8 +31,6 @@ export function BookUploadWizard({
     genre,
     year,
     publisher,
-    coverPreviewUrl,
-    hasCustomCover,
     fullText,
     isSubmitting,
     isScanning,
@@ -115,10 +113,6 @@ export function BookUploadWizard({
             onYearChange={actions.setYear}
             publisher={publisher}
             onPublisherChange={actions.setPublisher}
-            coverPreviewUrl={coverPreviewUrl}
-            hasCustomCover={hasCustomCover}
-            onCoverFileSelect={actions.selectCustomCover}
-            onRemoveCustomCover={actions.removeCustomCover}
             isbn={isbn}
           />
         ) : (
