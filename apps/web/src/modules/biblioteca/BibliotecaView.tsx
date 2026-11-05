@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 
 import { BookCard } from './BookCard';
+import { BookDetailModal } from './BookDetailModal';
+import { Book } from '@babilon/shared-types';
 import { CatalogFilterDropdown } from './CatalogFilterDropdown';
 import { BookReader } from './BookReader';
 import { BookUploadWizard } from '@/modules/upload/BookUploadWizard';
@@ -25,6 +27,7 @@ import { useBookReader } from './hooks/useBookReader';
 export function BibliotecaView() {
   const searchParams = useSearchParams();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [selectedDetailBook, setSelectedDetailBook] = useState<Book | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const {
@@ -235,7 +238,7 @@ export function BibliotecaView() {
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {catalog.books.map((book) => (
-                <BookCard key={book.id} book={book} onRead={openBook} />
+                <BookCard key={book.id} book={book} onRead={openBook} onSelect={setSelectedDetailBook} />
               ))}
             </div>
 
@@ -272,6 +275,15 @@ export function BibliotecaView() {
           </>
         )}
       </section>
+
+      {/* Modal de Detalle de Obra */}
+      {selectedDetailBook && (
+        <BookDetailModal
+          book={selectedDetailBook}
+          onClose={() => setSelectedDetailBook(null)}
+          onRead={openBook}
+        />
+      )}
 
       {/* Lector de Libros Digital */}
       {reader.readingBook && (

@@ -8,16 +8,28 @@ import { useReadingProgress } from './hooks/useReadingProgress';
 interface BookCardProps {
   book: Book;
   onRead: (book: Book) => void;
+  onSelect?: (book: Book) => void;
 }
 
-export function BookCard({ book, onRead }: BookCardProps) {
+export function BookCard({ book, onRead, onSelect }: BookCardProps) {
   const [imageError, setImageError] = useState(false);
   const { progress, progressPercent } = useReadingProgress(book.id);
   const primaryGenre = book.genres?.[0] || 'Clásicos';
   const hasCover = Boolean(book.coverUrl && !imageError);
 
+  const handleCardClick = () => {
+    if (onSelect) {
+      onSelect(book);
+    } else {
+      onRead(book);
+    }
+  };
+
   return (
-    <article className="bg-cream-50 dark:bg-surface-100 rounded-2xl border border-stone-200/90 dark:border-surface-300 overflow-hidden swiss-card flex flex-col group">
+    <article
+      onClick={handleCardClick}
+      className="bg-cream-50 dark:bg-surface-100 rounded-2xl border border-stone-200/90 dark:border-surface-300 overflow-hidden swiss-card flex flex-col group cursor-pointer transition-all hover:shadow-lg dark:hover:border-surface-400"
+    >
       {/* Visual Header / Cover Canvas */}
       <div className="h-52 bg-cream-100 dark:bg-surface-200 relative overflow-hidden border-b border-stone-200/80 dark:border-surface-300">
         {hasCover ? (
@@ -123,7 +135,10 @@ export function BookCard({ book, onRead }: BookCardProps) {
 
           <button
             type="button"
-            onClick={() => onRead(book)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onRead(book);
+            }}
             aria-label={`Leer ${book.title}`}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-stone-900 text-cream-50 dark:bg-cream-100 dark:text-stone-900 hover:bg-stone-800 dark:hover:bg-cream-50 text-xs font-medium transition-colors cursor-pointer"
           >
