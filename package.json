@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "pnpm --filter @babilon/web dev",
     "build:types": "pnpm --filter @babilon/shared-types build",
-    "build": "pnpm --filter @babilon/shared-types build && pnpm --filter @babilon/web build",
+    "build": "pnpm --filter @babilon/web build",
     "start": "pnpm --filter @babilon/web start"
   },
   "keywords": [
