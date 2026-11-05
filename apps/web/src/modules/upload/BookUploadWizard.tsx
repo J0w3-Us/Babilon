@@ -31,6 +31,7 @@ export function BookUploadWizard({
     genre,
     year,
     publisher,
+    synopsis,
     fullText,
     isSubmitting,
     isScanning,
@@ -114,6 +115,8 @@ export function BookUploadWizard({
             publisher={publisher}
             onPublisherChange={actions.setPublisher}
             isbn={isbn}
+            synopsis={synopsis}
+            onSynopsisChange={actions.setSynopsis}
           />
         ) : (
           <FileDropzone

@@ -15,6 +15,8 @@ interface MetadataFieldsProps {
   onYearChange: (value: number | '') => void;
   publisher: string;
   onPublisherChange: (value: string) => void;
+  synopsis: string;
+  onSynopsisChange: (value: string) => void;
 }
 
 export function MetadataFields({
@@ -29,9 +31,14 @@ export function MetadataFields({
   onYearChange,
   publisher,
   onPublisherChange,
+  synopsis,
+  onSynopsisChange,
 }: MetadataFieldsProps) {
   const inputBaseClasses =
     'w-full rounded-xl border border-stone-200/90 bg-cream-100 px-3.5 py-2.5 text-sm text-stone-900 transition-all placeholder:text-stone-400 focus:border-terracotta-300/70 focus:bg-cream-50 focus:outline-none focus:ring-2 focus:ring-terracotta-100/40 dark:border-surface-300 dark:bg-surface-200 dark:text-stone-100 dark:focus:border-surface-400 dark:focus:bg-surface-100 dark:focus:ring-surface-400/20';
+
+  const disabledInputClasses =
+    'w-full rounded-xl border border-stone-200/90 bg-stone-100/80 px-3.5 py-2.5 text-sm font-mono text-stone-600 cursor-not-allowed select-none opacity-85 dark:border-surface-300 dark:bg-surface-300/50 dark:text-stone-300';
 
   return (
     <div className="space-y-5">
@@ -126,22 +133,33 @@ export function MetadataFields({
         </div>
       </div>
 
-      <section
-        aria-label="Datos identificadores"
-        className="grid grid-cols-1 gap-4 rounded-xl border border-stone-200/80 bg-cream-100/60 p-4 dark:border-surface-300 dark:bg-surface-200/60 sm:grid-cols-2"
-      >
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
-          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">
-            ISBN
-          </p>
-          <p className="break-all font-mono text-sm text-stone-800 dark:text-stone-100">
-            {isbn || 'Se genera al seleccionar la obra'}
-          </p>
+          <label
+            htmlFor="book-isbn"
+            className="mb-1.5 flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-stone-700 dark:text-stone-300"
+          >
+            <span>ISBN (Código Identificador)</span>
+            <span className="text-[10px] font-medium text-stone-500 dark:text-stone-400">
+              Generado automáticamente
+            </span>
+          </label>
+          <input
+            id="book-isbn"
+            type="text"
+            readOnly
+            disabled
+            value={isbn || 'Se genera al seleccionar la obra'}
+            placeholder="Se genera al seleccionar la obra"
+            className={disabledInputClasses}
+            title="El código ISBN se genera de manera automática al cargar la obra"
+          />
         </div>
+
         <div>
           <label
             htmlFor="book-publisher"
-            className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400"
+            className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-stone-700 dark:text-stone-300"
           >
             Sello editorial
           </label>
@@ -154,8 +172,27 @@ export function MetadataFields({
             className={inputBaseClasses}
           />
         </div>
-      </section>
+      </div>
 
+      <div>
+        <label
+          htmlFor="book-synopsis"
+          className="mb-1.5 flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-stone-700 dark:text-stone-300"
+        >
+          <span>Sinopsis de la obra</span>
+          <span className="text-[10px] font-medium text-stone-500 dark:text-stone-400">
+            Visible en las tarjetas del catálogo
+          </span>
+        </label>
+        <textarea
+          id="book-synopsis"
+          rows={3}
+          value={synopsis}
+          onChange={(event) => onSynopsisChange(event.target.value)}
+          placeholder="Escribe o edita una breve reseña o sinopsis de la obra para orientar a los lectores en el catálogo..."
+          className={`${inputBaseClasses} resize-y min-h-[80px] leading-relaxed`}
+        />
+      </div>
     </div>
   );
 }
