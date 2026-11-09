@@ -2,7 +2,11 @@
 const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ['@babilon/shared-types'],
-  distDir: process.env.NEXT_DIST_DIR || '.next',
+  // Keep the dev server's output separate from `next build` so the two modes
+  // cannot overwrite each other's runtime chunks.
+  distDir:
+    process.env.NEXT_DIST_DIR ||
+    (process.env.NODE_ENV === 'development' ? '.next-dev' : '.next'),
   images: {
     remotePatterns: [
       {

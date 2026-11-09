@@ -41,6 +41,17 @@ const LEGAL_OR_REPOSITORY_PATTERNS = [
   /\bediciones\s+[A-Za-zÁ-ÿ]{2,}/iu,
 ];
 
+// Páginas de publicidad o navegación que suelen aparecer intercaladas en PDFs
+// descargados de repositorios. El filtro es deliberadamente conservador: no
+// descarta páginas breves de poesía ni páginas con texto narrativo.
+const PROMOTIONAL_PAGE_PATTERNS = [
+  /\bdescarga(?:r)?\s+(?:el\s+)?(?:libro|pdf)\b/iu,
+  /\blee\s+(?:este\s+)?(?:libro|obra)\s+(?:en\s+)?(?:línea|linea|online)\b/iu,
+  /\bvisita(?:r)?\s+(?:nuestro|nuestra|la)\s+(?:sitio|p[aá]gina|web)\b/iu,
+  /\b(?:síguenos|siguenos|suscríbete|suscribete)\b/iu,
+  /\bcatálogo\s+de\s+(?:libros|obras)\b/iu,
+];
+
 const INDEX_OR_TOC_HEADING =
   /^[#*\s]*(?:[ií]ndice(?:\s+general)?|tabla\s+de\s+contenidos?|tabla\s+de\s+materias?|sumario|table\s+of\s+contents|contents)\b/iu;
 
@@ -337,10 +348,14 @@ export function cleanAndFilterBookPages<
 
   // Paso 2: Localizar el inicio real del libro
   const startIndex = findBookStartPageIndex(strippedPages, metadata);
-  const selectedPages = strippedPages.slice(startIndex);
+  const afterPreliminary = strippedPages.slice(startIndex);
+  const selectedPages = afterPreliminary.filter((page) => !isClearlyNonBookPage(page.texto));
 
-  // Si por alguna razón la selección quedó vacía, revertir
-  const finalPages = selectedPages.length > 0 ? selectedPages : strippedPages;
+  // Si las reglas conservadoras clasificaran todas las páginas como basura,
+  // conservar las páginas con texto para evitar perder una obra por heurística.
+  const finalPages = selectedPages.length > 0
+    ? selectedPages
+    : afterPreliminary.filter((page) => page.texto.trim());
 
   // Paso 3: Re-enumerar secuencialmente desde 1
   return finalPages.map((page, index) => ({
@@ -348,5 +363,20 @@ export function cleanAndFilterBookPages<
     numero: index + 1,
     conteo_palabras: page.conteo_palabras ?? countWords(page.texto),
   }));
+}
+
+/** Omite páginas vacías y avisos promocionales breves, sin filtrar texto literario corto. */
+export function isClearlyNonBookPage(texto: string): boolean {
+  const clean = texto.trim();
+  if (!clean) return true;
+
+  const words = countWords(clean);
+  if (words > 45) return false;
+
+  const promotionalMatches = PROMOTIONAL_PAGE_PATTERNS.filter((pattern) => pattern.test(clean));
+  const legalMatches = LEGAL_OR_REPOSITORY_PATTERNS.filter((pattern) => pattern.test(clean));
+  const hasUrl = /(?:https?:\/\/|www\.)\S+/iu.test(clean);
+
+  return promotionalMatches.length > 0 || legalMatches.length >= 2 || (hasUrl && words < 25);
 }
 

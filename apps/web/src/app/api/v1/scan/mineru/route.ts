@@ -4,7 +4,7 @@ import { spawn } from 'child_process';
 import { promises as fs } from 'fs';
 import os from 'os';
 import path from 'path';
-import { extractText, getDocumentProxy } from 'unpdf';
+import { getDocumentProxy } from 'unpdf';
 import {
   buildPaginasFromMiddleJson,
   buildPaginasFromPageTexts,
@@ -34,12 +34,31 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 async function extractWithUnpdf(doc: Awaited<ReturnType<typeof getDocumentProxy>>) {
   const metadata = await doc.getMetadata();
   const info = metadata?.info as Record<string, unknown> | undefined;
-  const { totalPages, text } = await extractText(doc, { mergePages: false });
+  const totalPages = doc.numPages;
+  const batchSize = 10;
+  const text: string[] = [];
 
-  if (!Array.isArray(text) || text.length !== totalPages) {
-    throw new Error(
-      `unpdf devolvió ${Array.isArray(text) ? text.length : 0} páginas de texto para un PDF de ${totalPages} páginas.`
+  // Extrae un grupo acotado de páginas y cede el turno entre grupos para evitar
+  // materializar el texto del documento completo en una única operación.
+  for (let batchStart = 1; batchStart <= totalPages; batchStart += batchSize) {
+    const batchEnd = Math.min(batchStart + batchSize, totalPages + 1);
+    const batch = await Promise.all(
+      Array.from({ length: batchEnd - batchStart }, async (_, offset) => {
+        const page = await doc.getPage(batchStart + offset);
+        const content = await page.getTextContent();
+        return content.items
+          .map((item) => {
+            const textItem = item as { str?: unknown; hasEOL?: unknown };
+            return typeof textItem.str === 'string'
+              ? `${textItem.str}${textItem.hasEOL ? '\n' : ' '}`
+              : '';
+          })
+          .join('')
+          .trim();
+      })
     );
+    text.push(...batch);
+    await new Promise<void>((resolve) => setImmediate(resolve));
   }
 
   const paginas = buildPaginasFromPageTexts(
@@ -164,7 +183,7 @@ function makeScanResult(
   const omittedCount = rawPaginas.length - paginas.length;
   if (omittedCount > 0) {
     warnings.push(
-      `Se omitieron ${omittedCount} páginas preliminares (portada, índice y créditos). La lectura comienza en el inicio del libro.`
+      `Se omitieron ${omittedCount} páginas sin contenido útil o preliminares (portada, índice, créditos o avisos). Revisa el resultado antes de guardarlo.`
     );
   }
 

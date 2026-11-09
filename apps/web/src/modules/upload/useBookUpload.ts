@@ -278,7 +278,7 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
       }
 
       // Filtrar páginas preliminares (índice, créditos) y remover folios impresos
-      const rawPaginas = scanResult?.paginas?.length
+      const rawPaginas: Array<{ numero: number; texto: string; conteo_palabras?: number }> = scanResult?.paginas?.length
         ? scanResult.paginas
         : uploadText.trim()
           ? parseSeparatedPages(uploadText) ?? [{
