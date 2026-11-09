@@ -95,6 +95,7 @@ def extract_with_pymupdf(pdf_path):
         return {
             "title": document.metadata.get("title") or "",
             "author": document.metadata.get("author") or "",
+            "subject": document.metadata.get("subject") or "",
             "pageCount": document.page_count,
             "pages": pages,
             "engine": "pymupdf-page-text",

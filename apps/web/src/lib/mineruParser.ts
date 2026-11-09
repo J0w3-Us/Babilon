@@ -29,6 +29,64 @@ function cleanLine(line: string): string {
   return line.replace(/^[#*_\-\s]+/, '').replace(/[#*_\-\s]+$/, '').trim();
 }
 
+const NEXT_SECTION_HEADING = /^(?:#{1,6}\s+\S|(?:cap[ií]tulo|chapter|parte|part|libro|book|acto|pr[oó]logo|prefacio|introducci[oó]n|[ií]ndice|tabla\s+de\s+contenido|datos\s+editoriales|cr[eé]ditos|autor(?:a)?|isbn)\b)/iu;
+
+function extractLabeledSynopsis(markdown: string): string {
+  const lines = markdown.replace(/\r\n?/gu, '\n').split('\n');
+  const labelPattern = /^\s{0,3}(?:#{1,6}\s*)?(sinopsis(?:\s+de\s+(?:la\s+)?obra|\s+del\s+libro)?|synopsis|resumen(?:\s+de\s+la\s+obra)?|summary|abstract|argumento|plot|descripci[oó]n(?:\s+de\s+(?:la\s+)?obra|\s+del\s+libro)?|book\s+description|sobre\s+(?:esta\s+)?obra|sobre\s+este\s+libro|about\s+this\s+book)\s*(?::|：|[-–—])?\s*(.*)$/iu;
+  const pageSeparator = /^\s*(?:---\s*p[aá]gina\s+\d+\s*---|#{1,3}\s*p[aá]gina\s+\d+)\s*$/iu;
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const match = lines[index]?.match(labelPattern);
+    if (!match) continue;
+
+    const firstLine = (match[2] ?? '').trim();
+    const collected = firstLine ? [firstLine] : [];
+    let length = firstLine.length;
+
+    for (let next = index + 1; next < lines.length && length < 1400; next += 1) {
+      const line = lines[next]?.trim() ?? '';
+      if (!line || pageSeparator.test(line)) continue;
+      if (NEXT_SECTION_HEADING.test(line)) break;
+
+      // MinerU también puede devolver encabezados planos en mayúsculas.
+      const plainHeading = cleanLine(line);
+      if (
+        collected.length > 0 &&
+        plainHeading.length <= 70 &&
+        plainHeading === plainHeading.toLocaleUpperCase() &&
+        /[A-ZÁÉÍÓÚÜÑ]/u.test(plainHeading) &&
+        !/[.!?…]$/u.test(plainHeading)
+      ) {
+        break;
+      }
+
+      const excerpt = line.slice(0, 1400 - length).trim();
+      if (excerpt) {
+        collected.push(excerpt);
+        length += excerpt.length;
+      }
+    }
+
+    const synopsis = collected
+      .join(' ')
+      .replace(/\s+/gu, ' ')
+      .replace(/\s+([,.;:!?])/gu, '$1')
+      .trim();
+    if (synopsis.length >= 30) return synopsis;
+  }
+
+  return '';
+}
+
+function getMetadataSynopsis(metadata?: Record<string, unknown>): string {
+  const candidates = [metadata?.synopsis, metadata?.description, metadata?.subject, metadata?.Subject];
+  const synopsis = candidates.find((candidate): candidate is string =>
+    typeof candidate === 'string' && candidate.trim().length >= 30
+  );
+  return synopsis?.trim().slice(0, 1400) ?? '';
+}
+
 /**
  * Inferencia mejorada de metadatos a partir del Markdown extraído del PDF.
  * Ignora encabezados de página y fechas para detectar título, autor, ISBN y sinopsis.
@@ -117,15 +175,9 @@ export function processMinerUOutput(input: ParseMinerUInput): MinerUScanResult {
     }
   }
 
-  // 5. Sinopsis sugerida
-  // Se deja vacía por defecto para que el usuario la redacte a mano sin cortar texto del libro.
-  // Solo se extrae si existe explícitamente una sección rotulada como sinopsis/resumen.
-  let suggestedSynopsis = '';
-  const explicitPattern = /(?:sinopsis|resumen|argumento)\s*[:\-]\s*([^\r\n]{30,500})/i;
-  const explicitMatch = markdown.match(explicitPattern);
-  if (explicitMatch && explicitMatch[1]) {
-    suggestedSynopsis = explicitMatch[1].trim();
-  }
+  // 5. Sinopsis sugerida: priorizar una sección rotulada del documento y luego
+  // usar la descripción/subject incorporada en los metadatos del PDF o MinerU.
+  const suggestedSynopsis = extractLabeledSynopsis(markdown) || getMetadataSynopsis(metadata);
 
   return {
     engine: 'mineru',

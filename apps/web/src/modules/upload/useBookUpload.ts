@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Book, BookGenre, MinerUScanResult } from '@babilon/shared-types';
 import { createBookApi } from '@/services/api';
 import { mineruScannerService } from '@/services/mineru.service';
@@ -17,6 +17,20 @@ type MinerUScanWithBookDraft = MinerUScanResult & {
   suggestedBookDraft?: Partial<Book>;
 };
 
+export type UploadProgressStage =
+  | 'idle'
+  | 'uploading'
+  | 'extracting'
+  | 'cleaning'
+  | 'complete'
+  | 'error';
+
+export interface UploadProgressState {
+  stage: UploadProgressStage;
+  percent: number;
+  elapsedSeconds: number;
+}
+
 function generateBookIsbn(): string {
   return `ISBN-BAB-${Date.now().toString().slice(-6)}`;
 }
@@ -34,12 +48,50 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
   const [cleanedDocument, setCleanedDocument] = useState<StructuredBookDocument | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<UploadProgressState>({
+    stage: 'idle',
+    percent: 0,
+    elapsedSeconds: 0,
+  });
+  const progressStartedAt = useRef<number | null>(null);
   const [scanResult, setScanResult] = useState<MinerUScanResult | null>(null);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<{
     type: 'success' | 'error' | 'info';
     text: string;
   } | null>(null);
+
+  useEffect(() => {
+    if (!isScanning || progressStartedAt.current === null) return;
+    const timer = window.setInterval(() => {
+      const startedAt = progressStartedAt.current;
+      if (startedAt !== null) {
+        setUploadProgress((current) => ({
+          ...current,
+          elapsedSeconds: Math.floor((Date.now() - startedAt) / 1000),
+        }));
+      }
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [isScanning]);
+
+  const startProgress = (stage: UploadProgressStage) => {
+    progressStartedAt.current = Date.now();
+    setUploadProgress({ stage, percent: 0, elapsedSeconds: 0 });
+  };
+
+  const finishProgress = (stage: 'complete' | 'error') => {
+    const startedAt = progressStartedAt.current;
+    setUploadProgress((current) => ({
+      ...current,
+      stage,
+      percent: stage === 'complete' ? 100 : current.percent,
+      elapsedSeconds: startedAt === null
+        ? current.elapsedSeconds
+        : Math.floor((Date.now() - startedAt) / 1000),
+    }));
+    progressStartedAt.current = null;
+  };
 
   const handleFileUpload = async (file: File) => {
     const isPdf = file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf';
@@ -58,16 +110,25 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
     setFullText('');
     setCleanedDocument(null);
     setScanResult(null);
+    setUploadProgress({ stage: 'idle', percent: 0, elapsedSeconds: 0 });
 
     if (isPdf) {
       setIsScanning(true);
+      startProgress('uploading');
       setStatusMessage({
         type: 'info',
         text: 'Procesando el PDF con el servicio externo de digitalización...',
       });
 
       try {
-        const result = await mineruScannerService.scan(file);
+        const result = await mineruScannerService.scan(file, (loaded, total) => {
+          const percent = total > 0 ? Math.min(100, Math.round((loaded / total) * 100)) : 0;
+          setUploadProgress((current) => ({
+            ...current,
+            stage: percent >= 100 ? 'extracting' : 'uploading',
+            percent,
+          }));
+        });
         if (result.success && result.data?.success !== false && result.data) {
           const scan = result.data;
           const scanWithBookDraft = scan as MinerUScanWithBookDraft;
@@ -92,6 +153,7 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
             type: 'info',
             text: 'PDF recibido. Limpiando texto y separando capítulos del material extra...',
           });
+          setUploadProgress((current) => ({ ...current, stage: 'cleaning', percent: 0 }));
           const cleanedResult = await cleanAndStructureBookDocumentAsync(
             sourceMarkdown,
             { title: documentTitle, author: documentAuthor }
@@ -124,6 +186,7 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
               ? 'Texto limpio y estructurado. Revisa el cuerpo y el material extra antes de guardar.'
               : 'No se detectó cuerpo principal. Revisa el archivo antes de guardarlo.',
           });
+          finishProgress('complete');
           setUploadTab('meta');
         } else {
           setUploadedFileName(null);
@@ -134,6 +197,7 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
             type: 'error',
             text: result.message || 'El servicio externo no pudo procesar el PDF.',
           });
+          finishProgress('error');
         }
       } catch (error: unknown) {
         setUploadedFileName(null);
@@ -146,6 +210,7 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
             ? `No se pudo procesar el PDF: ${error.message}`
             : 'No se pudo procesar el PDF con el servicio externo.',
         });
+        finishProgress('error');
       } finally {
         setIsScanning(false);
       }
@@ -160,6 +225,7 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
         const documentTitle = title.trim() || cleanName;
         const documentAuthor = author.trim();
         setIsScanning(true);
+        startProgress('cleaning');
         setStatusMessage({
           type: 'info',
           text: 'Limpiando texto y separando el cuerpo del material extra...',
@@ -181,6 +247,7 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
               ? 'Texto limpio y organizado para su revisión.'
               : 'No se detectó cuerpo principal. Revisa el archivo antes de guardarlo.',
           });
+          finishProgress('complete');
           setUploadTab('meta');
         } catch (error: unknown) {
           setUploadedFileName(null);
@@ -193,6 +260,7 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
               ? `No se pudo limpiar el documento: ${error.message}`
               : 'No se pudo limpiar el documento.',
           });
+          finishProgress('error');
         } finally {
           setIsScanning(false);
         }
@@ -203,6 +271,7 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
           type: 'error',
           text: 'El archivo no contiene texto legible.',
         });
+        setUploadProgress({ stage: 'error', percent: 0, elapsedSeconds: 0 });
       }
     };
     reader.onerror = () => {
@@ -212,6 +281,7 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
         type: 'error',
         text: 'No se pudo leer el archivo seleccionado.',
       });
+      setUploadProgress({ stage: 'error', percent: 0, elapsedSeconds: 0 });
     };
     reader.readAsText(file);
   };
@@ -223,6 +293,8 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
     setCleanedDocument(null);
     setScanResult(null);
     setStatusMessage(null);
+    setUploadProgress({ stage: 'idle', percent: 0, elapsedSeconds: 0 });
+    progressStartedAt.current = null;
   };
 
   const handleTextChange = (text: string) => {
@@ -346,6 +418,7 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
       cleanedDocument,
       isSubmitting,
       isScanning,
+      uploadProgress,
       scanResult,
       uploadedFileName,
       statusMessage,

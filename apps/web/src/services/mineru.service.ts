@@ -20,7 +20,7 @@ function isMinerUScanResult(value: unknown): value is MinerUScanResult {
 }
 
 export interface IMinerUScannerService {
-  scan(file: File): Promise<{
+  scan(file: File, onUploadProgress?: (loaded: number, total: number) => void): Promise<{
     success: boolean;
     data?: MinerUScanResult;
     message?: string;
@@ -34,7 +34,10 @@ export class MinerUHttpScannerService implements IMinerUScannerService {
     this.endpoint = endpoint;
   }
 
-  async scan(file: File): Promise<{
+  async scan(
+    file: File,
+    onUploadProgress?: (loaded: number, total: number) => void
+  ): Promise<{
     success: boolean;
     data?: MinerUScanResult;
     message?: string;
@@ -43,12 +46,33 @@ export class MinerUHttpScannerService implements IMinerUScannerService {
       const formData = new FormData();
       formData.append('file', file);
 
-      const res = await fetch(this.endpoint, {
-        method: 'POST',
-        body: formData,
+      const responseBody = await new Promise<unknown>((resolve, reject) => {
+        const request = new XMLHttpRequest();
+        request.open('POST', this.endpoint);
+        request.responseType = 'json';
+        request.upload.addEventListener('progress', (event) => {
+          if (event.lengthComputable) onUploadProgress?.(event.loaded, event.total);
+        });
+        request.upload.addEventListener('load', () => {
+          onUploadProgress?.(file.size, file.size);
+        });
+        request.addEventListener('load', () => {
+          if (request.status >= 200 && request.status < 300) {
+            resolve(request.response);
+            return;
+          }
+          resolve({
+            success: false,
+            message: isRecord(request.response) && typeof request.response.message === 'string'
+              ? request.response.message
+              : `Error al procesar el documento (HTTP ${request.status}).`,
+          });
+        });
+        request.addEventListener('error', () => reject(new Error('Error de red durante el escaneo.')));
+        request.addEventListener('abort', () => reject(new Error('La petición de escaneo fue cancelada.')));
+        request.send(formData);
       });
 
-      const responseBody: unknown = await res.json();
       if (!isRecord(responseBody)) {
         return {
           success: false,
@@ -56,7 +80,7 @@ export class MinerUHttpScannerService implements IMinerUScannerService {
         };
       }
 
-      if (!res.ok || responseBody.success !== true) {
+      if (responseBody.success !== true) {
         return {
           success: false,
           message:

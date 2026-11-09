@@ -23,6 +23,7 @@ interface PythonExtractionResult {
   pages?: Array<{ pageNumber: number; markdown: string }>;
   title?: string;
   author?: string;
+  subject?: string;
   pageCount?: number;
   engine?: string;
 }
@@ -75,6 +76,7 @@ async function extractWithUnpdf(doc: Awaited<ReturnType<typeof getDocumentProxy>
     paginas,
     title: typeof info?.Title === 'string' ? info.Title.trim() : '',
     author: typeof info?.Author === 'string' ? info.Author.trim() : '',
+    subject: typeof info?.Subject === 'string' ? info.Subject.trim() : '',
     warnings: validation.warnings,
   };
 }
@@ -138,6 +140,7 @@ async function tryExtractWithPython(
             pages,
             title: typeof result.title === 'string' ? result.title : undefined,
             author: typeof result.author === 'string' ? result.author : undefined,
+            subject: typeof result.subject === 'string' ? result.subject : undefined,
             pageCount: typeof result.pageCount === 'number' ? result.pageCount : undefined,
             engine: typeof result.engine === 'string' ? result.engine : undefined,
           });
@@ -229,6 +232,12 @@ export async function POST(request: NextRequest) {
     const uint8Array = new Uint8Array(await file.arrayBuffer());
     const pdfDocument = await getDocumentProxy(uint8Array);
     const expectedPageCount = pdfDocument.numPages;
+    const pdfInfo = (await pdfDocument.getMetadata())?.info as Record<string, unknown> | undefined;
+    const pdfMetadata = {
+      title: typeof pdfInfo?.Title === 'string' ? pdfInfo.Title.trim() : '',
+      author: typeof pdfInfo?.Author === 'string' ? pdfInfo.Author.trim() : '',
+      subject: typeof pdfInfo?.Subject === 'string' ? pdfInfo.Subject.trim() : '',
+    };
     if (!Number.isInteger(expectedPageCount) || expectedPageCount < 1) {
       throw new Error('No se pudo determinar la cantidad de páginas físicas del PDF.');
     }
@@ -270,9 +279,10 @@ export async function POST(request: NextRequest) {
             if (middleJson !== undefined) {
               try {
                 const paginas = buildPaginasFromMiddleJson(middleJson, expectedPageCount);
-                const metadata = isRecord(remotePayload.metadata)
-                  ? remotePayload.metadata
-                  : undefined;
+                const metadata = {
+                  ...pdfMetadata,
+                  ...(isRecord(remotePayload.metadata) ? remotePayload.metadata : {}),
+                };
                 const validation = validatePaginasCoverage(
                   paginas,
                   expectedPageCount,
@@ -347,7 +357,12 @@ export async function POST(request: NextRequest) {
         const scanData = makeScanResult(
           paginas,
           filename,
-          { title: pythonResult.title, author: pythonResult.author },
+          {
+            ...pdfMetadata,
+            title: pythonResult.title || pdfMetadata.title,
+            author: pythonResult.author || pdfMetadata.author,
+            subject: pythonResult.subject || pdfMetadata.subject,
+          },
           startTime,
           warnings
         );
@@ -389,7 +404,12 @@ export async function POST(request: NextRequest) {
         const scanData = makeScanResult(
           paginas,
           filename,
-          { title: pythonResult.title, author: pythonResult.author },
+          {
+            ...pdfMetadata,
+            title: pythonResult.title || pdfMetadata.title,
+            author: pythonResult.author || pdfMetadata.author,
+            subject: pythonResult.subject || pdfMetadata.subject,
+          },
           startTime,
           warnings
         );
@@ -418,7 +438,11 @@ export async function POST(request: NextRequest) {
     const scanData = makeScanResult(
       unpdfResult.paginas,
       filename,
-      { title: unpdfResult.title, author: unpdfResult.author },
+      {
+        title: unpdfResult.title,
+        author: unpdfResult.author,
+        subject: unpdfResult.subject,
+      },
       startTime,
       warnings
     );

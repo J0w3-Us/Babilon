@@ -118,3 +118,16 @@
 .animate-fade-in {
   animation: fadeIn 0.25s ease-out;
 }
+
+@keyframes progressIndeterminate {
+  from {
+    transform: translateX(-110%);
+  }
+  to {
+    transform: translateX(310%);
+  }
+}
+
+.animate-progress-indeterminate {
+  animation: progressIndeterminate 1.4s ease-in-out infinite;
+}
