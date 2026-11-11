@@ -6,6 +6,7 @@ import {
   BookOpen,
   Compass,
   UploadCloud,
+  Sparkles,
   LogIn,
   UserPlus,
   LogOut,
@@ -58,13 +59,22 @@ export default function NavbarClient() {
               Catálogo
             </Link>
             {isAdmin && (
-              <Link
-                href="/subir"
-                className="hover:text-terracotta-600 dark:hover:text-terracotta-500 transition-colors flex items-center gap-1.5"
-              >
-                <UploadCloud size={15} />
-                Subir Obra
-              </Link>
+              <>
+                <Link
+                  href="/subir"
+                  className="hover:text-terracotta-600 dark:hover:text-terracotta-500 transition-colors flex items-center gap-1.5"
+                >
+                  <UploadCloud size={15} />
+                  Subir Obra
+                </Link>
+                <Link
+                  href="/explorar-libres"
+                  className="hover:text-terracotta-600 dark:hover:text-terracotta-500 transition-colors flex items-center gap-1.5"
+                >
+                  <Sparkles size={15} className="text-terracotta-600 dark:text-terracotta-400" />
+                  Obras Libres (API)
+                </Link>
+              </>
             )}
           </nav>
 

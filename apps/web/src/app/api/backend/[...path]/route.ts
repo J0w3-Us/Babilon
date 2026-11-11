@@ -194,6 +194,11 @@ async function handleDirectMongo(
           : ['General'];
       const paginas = Array.isArray(body.paginas) ? body.paginas : [];
       const totalPaginas = Number(body.total_paginas ?? body.pageCount ?? paginas.length);
+      const portadaUrl = typeof body.portada_url === 'string' && body.portada_url.trim()
+        ? body.portada_url.trim()
+        : typeof body.coverUrl === 'string' && body.coverUrl.trim()
+          ? body.coverUrl.trim()
+          : undefined;
       const ahora = new Date().toISOString();
 
       const docToSave: Record<string, unknown> = {
@@ -214,6 +219,8 @@ async function handleDirectMongo(
         idioma: 'es',
         total_paginas: totalPaginas,
         paginas,
+        ...(portadaUrl ? { portada_url: portadaUrl, coverUrl: portadaUrl } : {}),
+        ...(typeof body.google_book_id === 'string' ? { google_book_id: body.google_book_id } : {}),
         fecha_actualizacion: ahora,
         fecha_procesamiento: ahora,
       };

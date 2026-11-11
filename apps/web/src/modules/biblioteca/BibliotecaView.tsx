@@ -12,6 +12,7 @@ import {
   UploadCloud,
   CheckCircle2,
   ArrowLeft,
+  Sparkles,
 } from 'lucide-react';
 
 import { BookCard } from './BookCard';
@@ -104,13 +105,22 @@ export function BibliotecaView() {
             )}
 
             {isAdmin && (
-              <Link
-                href="/subir"
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-stone-900 text-cream-50 hover:bg-stone-800 dark:bg-cream-100 dark:text-stone-900 dark:hover:bg-cream-50 text-xs font-semibold shadow-subtle transition-all cursor-pointer"
-              >
-                <UploadCloud size={14} />
-                <span>Digitalizar Obra</span>
-              </Link>
+              <>
+                <Link
+                  href="/explorar-libres"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-terracotta-50 text-terracotta-800 hover:bg-terracotta-100 dark:bg-terracotta-950/50 dark:text-terracotta-300 dark:hover:bg-terracotta-900/50 border border-terracotta-200 dark:border-terracotta-800/60 text-xs font-semibold shadow-subtle transition-all cursor-pointer"
+                >
+                  <Sparkles size={14} className="text-terracotta-600 dark:text-terracotta-400" />
+                  <span>Obras Libres (API)</span>
+                </Link>
+                <Link
+                  href="/subir"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-stone-900 text-cream-50 hover:bg-stone-800 dark:bg-cream-100 dark:text-stone-900 dark:hover:bg-cream-50 text-xs font-semibold shadow-subtle transition-all cursor-pointer"
+                >
+                  <UploadCloud size={14} />
+                  <span>Digitalizar Obra</span>
+                </Link>
+              </>
             )}
           </div>
         </div>

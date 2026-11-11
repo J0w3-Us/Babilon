@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { BookUploadWizard } from './BookUploadWizard';
-import { ArrowLeft, UploadCloud, ShieldCheck, Lock, LogIn } from 'lucide-react';
+import { ArrowLeft, UploadCloud, ShieldCheck, Lock, LogIn, Sparkles } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
 export function UploadView() {
@@ -42,17 +42,29 @@ export function UploadView() {
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-10">
         {/* Cabecera Editorial */}
-        <div className="mb-7">
-          <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-cream-200 dark:bg-surface-200 text-stone-700 dark:text-stone-300 text-[11px] font-semibold uppercase tracking-wider border border-stone-200/80 dark:border-surface-300 mb-2.5">
-            <UploadCloud size={12} className="text-terracotta-600 dark:text-terracotta-500" />
-            <span>Ingesta Literaria</span>
+        <div className="mb-7 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+          <div>
+            <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-cream-200 dark:bg-surface-200 text-stone-700 dark:text-stone-300 text-[11px] font-semibold uppercase tracking-wider border border-stone-200/80 dark:border-surface-300 mb-2.5">
+              <UploadCloud size={12} className="text-terracotta-600 dark:text-terracotta-500" />
+              <span>Ingesta Literaria</span>
+            </div>
+            <h1 className="font-serif text-3xl sm:text-4xl font-bold text-stone-900 dark:text-stone-50 tracking-tight">
+              Digitalizar y Subir Obra
+            </h1>
+            <p className="text-sm text-stone-600 dark:text-stone-400 mt-1.5 max-w-2xl leading-relaxed">
+              Preserva textos universales o producciones académicas en el repositorio de Babilon. Podrás incorporar datos bibliográficos precisos y el texto íntegro para lectura en alta resolución.
+            </p>
           </div>
-          <h1 className="font-serif text-3xl sm:text-4xl font-bold text-stone-900 dark:text-stone-50 tracking-tight">
-            Digitalizar y Subir Obra
-          </h1>
-          <p className="text-sm text-stone-600 dark:text-stone-400 mt-1.5 max-w-2xl leading-relaxed">
-            Preserva textos universales o producciones académicas en el repositorio de Babilon. Podrás incorporar datos bibliográficos precisos y el texto íntegro para lectura en alta resolución.
-          </p>
+
+          {isAdmin && (
+            <Link
+              href="/explorar-libres"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-stone-900 text-cream-50 hover:bg-stone-800 dark:bg-cream-100 dark:text-stone-900 dark:hover:bg-cream-50 text-xs font-semibold shadow-subtle transition-all shrink-0"
+            >
+              <Sparkles size={14} className="text-terracotta-500" />
+              <span>Explorar Obras Libres (Google Books API)</span>
+            </Link>
+          )}
         </div>
 
         {isAdmin ? (
