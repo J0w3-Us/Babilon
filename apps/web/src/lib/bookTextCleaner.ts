@@ -44,6 +44,147 @@ const CHAPTER_HEADING =
 const MARKDOWN_HEADING = /^[ \t]{0,3}#{1,6}[ \t]+(.+?)[ \t]*#*[ \t]*$/u;
 const NO_INFERRED_HEADERS = new Set<string>();
 
+const HEADING_LINE_PATTERNS = [
+  /^[ \t]*#{1,6}[ \t]+\S+/u,
+  /^[ \t]*(?:cap[ií]tulo|chapter)\s+(?:\d+|[ivxlcdm]+|[a-záéíóúüñ]+)(?:\s*[:\-–—].*)?$/iu,
+  /^[ \t]*(?:parte|part|libro|book|acto|act)\s+(?:\d+|[ivxlcdm]+)(?:\s*[:\-–—].*)?$/iu,
+  /^[ \t]*\d{1,3}\.?\s+[A-ZÁÉÍÓÚÜÑ][^.!?\n]{2,70}$/u,
+  /^[ \t]*[IVXLCDM]{1,6}\.\s+[A-ZÁÉÍÓÚÜÑ][^.!?\n]{2,70}$/u,
+  /^[ \t]*(?:pr[oó]logo|prefacio|introducci[oó]n|ep[ií]logo|sinopsis|dedicatoria|aviso\s+al\s+lector)\b.*$/iu,
+];
+
+// Comprueba si una cadena tiene formato de letras espaciadas (ej: "S I N O P S I S")
+function isSpacedLettersWord(word: string): boolean {
+  return /^(?:[A-ZÁÉÍÓÚÜÑ]\s+){2,}[A-ZÁÉÍÓÚÜÑ]$/u.test(word.trim());
+}
+
+function collapseSpacedLetters(word: string): string {
+  return word.replace(/\s+/g, '');
+}
+
+export function isHeadingLine(line: string): boolean {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed.length > 80) return false;
+  if (isSpacedLettersWord(trimmed)) return true;
+  if (HEADING_LINE_PATTERNS.some((p) => p.test(trimmed))) return true;
+
+  // Mayúsculas sostenidas cortas (<= 65 caracteres, sin punto final al terminar)
+  if (
+    trimmed.length >= 4 &&
+    trimmed.length <= 65 &&
+    trimmed === trimmed.toLocaleUpperCase() &&
+    /[A-ZÁÉÍÓÚÜÑ]/.test(trimmed) &&
+    !/[.!?…]$/.test(trimmed)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Desglosa y separa títulos que hayan quedado pegados en la misma línea del párrafo por el OCR o PDF
+ * Ejemplos:
+ * "S I N O P S I S Trece capítulos breves..." -> ["### SINOPSIS", "Trece capítulos breves..."]
+ * "1 Sobre la evaluación La guerra es de vital..." -> ["### 1 Sobre la evaluación", "La guerra es de vital..."]
+ */
+function splitGluedHeadingAndParagraph(line: string): string[] {
+  const trimmed = line.trim();
+
+  // 1. Caso: Letras espaciadas al inicio (ej: "S I N O P S I S Trece capítulos...")
+  const spacedMatch = trimmed.match(/^((?:[A-ZÁÉÍÓÚÜÑ]\s+){2,}[A-ZÁÉÍÓÚÜÑ])\s+([A-ZÁÉÍÓÚÜÑa-záéíóúüñ].*)$/u);
+  if (spacedMatch && spacedMatch[1] && spacedMatch[2]) {
+    const heading = collapseSpacedLetters(spacedMatch[1]);
+    return [`### ${heading}`, spacedMatch[2].trim()];
+  }
+
+  // 2. Caso: Palabra clave de sección pegada al párrafo (ej: "SINOPSIS Trece capítulos...")
+  const sectionKeywordMatch = trimmed.match(
+    /^(SINOPSIS|PR[OÓ]LOGO|PREFACIO|INTRODUCCI[OÓ]N|EP[IÍ]LOGO|DEDICATORIA|ARGUMENTO)\s+([A-ZÁÉÍÓÚÜÑa-záéíóúüñ].*)$/u
+  );
+  if (sectionKeywordMatch && sectionKeywordMatch[1] && sectionKeywordMatch[2]) {
+    return [`### ${sectionKeywordMatch[1]}`, sectionKeywordMatch[2].trim()];
+  }
+
+  // 3. Caso: Capítulo numerado pegado a la primera frase (ej: "1 Sobre la evaluación La guerra es de...")
+  const numberedChapterMatch = trimmed.match(
+    /^(\d{1,3}\.?\s+(?:Sobre\s+|De\s+|En\s+|El\s+|La\s+|Los\s+|Las\s+|[A-ZÁÉÍÓÚÜÑ])[^.!?\n]{2,50}?)\s+([A-ZÁÉÍÓÚÜÑ][a-záéíóúüñ].*)$/u
+  );
+  if (numberedChapterMatch && numberedChapterMatch[1] && numberedChapterMatch[2]) {
+    return [`### ${numberedChapterMatch[1].trim()}`, numberedChapterMatch[2].trim()];
+  }
+
+  // 4. Caso: Título explícito en mayúsculas sostenidas pegado a frase mixta (ej: "EL HOMBRE MÁS RICO Bansir era...")
+  const allCapsMatch = trimmed.match(/^([A-ZÁÉÍÓÚÜÑ\s0-9.,\-–—:]{4,45})\s+([A-ZÁÉÍÓÚÜÑ][a-záéíóúüñ]{2,}.*)$/u);
+  if (allCapsMatch && allCapsMatch[1] && allCapsMatch[2]) {
+    const possibleHeading = allCapsMatch[1].trim();
+    if (
+      possibleHeading === possibleHeading.toLocaleUpperCase() &&
+      !/[.!?…]$/.test(possibleHeading) &&
+      possibleHeading.split(/\s+/).length <= 6
+    ) {
+      return [`### ${possibleHeading}`, allCapsMatch[2].trim()];
+    }
+  }
+
+  return [trimmed];
+}
+
+export function formatPageTextStructure(text: string): string {
+  if (!text) return '';
+  const lines = text
+    .replace(/\r\n?/g, '\n')
+    .replace(PAGINATION_LINE, '')
+    .replace(PAGE_SEPARATOR_LINE, '')
+    .split('\n');
+
+  const processedLines: string[] = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      processedLines.push('');
+      continue;
+    }
+
+    // Omitir líneas puramente decorativas (rayas, guiones o puntos aislados de diseño)
+    if (/^[-_—~=•*]{3,}$/u.test(trimmed)) {
+      continue;
+    }
+
+    // Comprobar si la línea tiene un título pegado al párrafo
+    const splitted = splitGluedHeadingAndParagraph(trimmed);
+    if (splitted.length > 1) {
+      for (const piece of splitted) {
+        if (piece.startsWith('### ')) {
+          processedLines.push('');
+          processedLines.push(piece);
+          processedLines.push('');
+        } else {
+          processedLines.push(piece);
+        }
+      }
+      continue;
+    }
+
+    // Si es una línea independiente de título
+    if (isHeadingLine(trimmed)) {
+      const cleanHeading = isSpacedLettersWord(trimmed)
+        ? collapseSpacedLetters(trimmed)
+        : trimmed;
+      const formattedHeading = cleanHeading.startsWith('#')
+        ? cleanHeading
+        : `### ${cleanHeading}`;
+      processedLines.push('');
+      processedLines.push(formattedHeading);
+      processedLines.push('');
+    } else {
+      processedLines.push(trimmed);
+    }
+  }
+
+  return normalizePageLineBreaks(processedLines);
+}
+
 function comparableText(value: string): string {
   return value
     .replace(MARKDOWN_HEADING, '$1')
@@ -126,15 +267,21 @@ function normalizePageLineBreaks(lines: string[]): string {
 
   return markdownHeadingsPreserved
     .split(/\n[ \t]*\n+/u)
-    .map((paragraph) =>
-      paragraph
+    .map((paragraph) => {
+      const trimmed = paragraph.trim();
+      if (!trimmed) return '';
+      // Si es un encabezado markdown, conservarlo intacto en su propia línea
+      if (/^#{1,6}[ \t]+/.test(trimmed)) {
+        return trimmed;
+      }
+      return trimmed
         .split('\n')
         .map((line) => line.trim())
         .filter(Boolean)
         .join(' ')
         .replace(/(?<=\p{L})-[ \t]*(?=\p{Ll})/gu, '')
-        .replace(/[ \t]{2,}/g, ' ')
-    )
+        .replace(/[ \t]{2,}/g, ' ');
+    })
     .filter(Boolean)
     .join('\n\n')
     .trim();

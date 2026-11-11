@@ -2,8 +2,11 @@
 
 import Link from 'next/link';
 import { Sparkles, ArrowRight, UploadCloud } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 
 export function CallToActionSection() {
+  const { isAdmin } = useAuth();
+
   return (
     <section className="py-20 lg:py-24 bg-stone-100/60 dark:bg-surface-50 transition-colors duration-200">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -30,13 +33,15 @@ export function CallToActionSection() {
               <ArrowRight size={15} />
             </Link>
 
-            <Link
-              href="/subir"
-              className="inline-flex items-center gap-2 px-5 py-3.5 rounded-xl bg-stone-800 hover:bg-stone-700 dark:bg-surface-200 dark:hover:bg-surface-300 text-white font-medium text-sm transition-all border border-stone-700 dark:border-surface-300 cursor-pointer"
-            >
-              <UploadCloud size={16} />
-              <span>Digitalizar Obra</span>
-            </Link>
+            {isAdmin && (
+              <Link
+                href="/subir"
+                className="inline-flex items-center gap-2 px-5 py-3.5 rounded-xl bg-stone-800 hover:bg-stone-700 dark:bg-surface-200 dark:hover:bg-surface-300 text-white font-medium text-sm transition-all border border-stone-700 dark:border-surface-300 cursor-pointer"
+              >
+                <UploadCloud size={16} />
+                <span>Digitalizar Obra</span>
+              </Link>
+            )}
           </div>
         </div>
       </div>

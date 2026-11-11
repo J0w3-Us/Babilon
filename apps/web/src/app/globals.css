@@ -131,3 +131,47 @@
 .animate-progress-indeterminate {
   animation: progressIndeterminate 1.4s ease-in-out infinite;
 }
+
+/* Ocultar botones de incremento/decremento (spinners) en inputs numéricos */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* ============================================= */
+/* Scrollbars Editoriales Estilizados            */
+/* ============================================= */
+.custom-reader-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(160, 150, 140, 0.35) transparent;
+}
+
+.custom-reader-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-reader-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-reader-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(160, 150, 140, 0.35);
+  border-radius: 9999px;
+}
+
+.custom-reader-scrollbar:hover::-webkit-scrollbar-thumb {
+  background-color: rgba(194, 89, 63, 0.6);
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

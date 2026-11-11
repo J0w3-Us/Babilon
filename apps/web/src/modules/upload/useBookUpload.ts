@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { Book, BookGenre, MinerUScanResult } from '@babilon/shared-types';
-import { createBookApi } from '@/services/api';
+import { createBookApi, requestUploadSecurityToken } from '@/services/api';
 import { mineruScannerService } from '@/services/mineru.service';
 import { parseSeparatedPages, splitTextIntoPages } from '@/lib/pageSplitter';
 import { cleanAndFilterBookPages } from '@/lib/bookPageCleaner';
-import { formatBookDocumentForUpload,} from '@/lib/bookTextCleaner';
+import { formatBookDocumentForUpload, formatPageTextStructure } from '@/lib/bookTextCleaner';
 import type { StructuredBookDocument } from '@/lib/bookTextCleaner';
 import { cleanAndStructureBookDocumentAsync } from '@/lib/bookTextCleanerAsync';
 import { GENRES_LIST } from './bookUploadOptions';
+import type { PageItem } from './PageManager';
 
 export interface UseBookUploadOptions {
   onSuccess?: () => void;
@@ -36,7 +37,6 @@ function generateBookIsbn(): string {
 }
 
 export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
-  const [uploadTab, setUploadTab] = useState<'meta' | 'content'>('content');
   const [title, setTitle] = useState('');
   const [author, setAuthor] = useState('');
   const [isbn, setIsbn] = useState('');
@@ -46,6 +46,7 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
   const [synopsis, setSynopsis] = useState('');
   const [fullText, setFullText] = useState('');
   const [cleanedDocument, setCleanedDocument] = useState<StructuredBookDocument | null>(null);
+  const [pagesList, setPagesList] = useState<PageItem[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<UploadProgressState>({
@@ -93,6 +94,16 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
     progressStartedAt.current = null;
   };
 
+  const togglePageExcluded = (id: string) => {
+    setPagesList((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, eliminada: !p.eliminada } : p))
+    );
+  };
+
+  const restoreAllPages = () => {
+    setPagesList((prev) => prev.map((p) => ({ ...p, eliminada: false })));
+  };
+
   const handleFileUpload = async (file: File) => {
     const isPdf = file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf';
     const isTextFile = /\.(txt|md)$/i.test(file.name) || file.type === 'text/plain';
@@ -106,10 +117,16 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
     }
 
     setUploadedFileName(file.name);
+    setTitle('');
+    setAuthor('');
+    setSynopsis('');
+    setGenre('');
+    setYear('');
     setIsbn(generateBookIsbn());
     setFullText('');
     setCleanedDocument(null);
     setScanResult(null);
+    setPagesList([]);
     setUploadProgress({ stage: 'idle', percent: 0, elapsedSeconds: 0 });
 
     if (isPdf) {
@@ -117,7 +134,7 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
       startProgress('uploading');
       setStatusMessage({
         type: 'info',
-        text: 'Procesando el PDF con el servicio externo de digitalización...',
+        text: 'Procesando el PDF con el servicio de digitalización...',
       });
 
       try {
@@ -151,7 +168,7 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
 
           setStatusMessage({
             type: 'info',
-            text: 'PDF recibido. Limpiando texto y separando capítulos del material extra...',
+            text: 'PDF recibido. Limpiando texto y separando páginas...',
           });
           setUploadProgress((current) => ({ ...current, stage: 'cleaning', percent: 0 }));
           const cleanedResult = await cleanAndStructureBookDocumentAsync(
@@ -161,7 +178,38 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
 
           setScanResult({ ...scan, rawMarkdown: cleanedResult.cleanedMarkdown });
           setCleanedDocument(cleanedResult.structure);
-          setFullText(formatBookDocumentForUpload(cleanedResult.structure));
+          const formattedText = formatBookDocumentForUpload(cleanedResult.structure);
+          setFullText(formattedText);
+
+          // Construir lista interactiva de páginas con formato de párrafos y títulos
+          let extractedPages: PageItem[] = [];
+          if (scan.pages && scan.pages.length > 0) {
+            extractedPages = [...scan.pages]
+              .sort((a, b) => a.pageNumber - b.pageNumber)
+              .map((p, idx) => {
+                const formatted = formatPageTextStructure(p.markdown || '');
+                return {
+                  id: `page-${idx + 1}-${Date.now()}`,
+                  originalIndex: p.pageNumber || idx + 1,
+                  texto: formatted,
+                  conteo_palabras: formatted.trim().split(/\s+/).filter(Boolean).length,
+                  eliminada: false,
+                };
+              });
+          } else {
+            const rawParsed = parseSeparatedPages(formattedText) || splitTextIntoPages(formattedText);
+            extractedPages = rawParsed.map((p, idx) => {
+              const formatted = formatPageTextStructure(p.texto || '');
+              return {
+                id: `page-${idx + 1}-${Date.now()}`,
+                originalIndex: p.numero || idx + 1,
+                texto: formatted,
+                conteo_palabras: p.conteo_palabras || formatted.trim().split(/\s+/).filter(Boolean).length,
+                eliminada: false,
+              };
+            });
+          }
+          setPagesList(extractedPages);
 
           if (detectedTitle) setTitle((current) => current.trim() || detectedTitle);
           if (detectedAuthor) setAuthor((current) => current.trim() || detectedAuthor);
@@ -182,17 +230,15 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
 
           setStatusMessage({
             type: 'success',
-            text: cleanedResult.structure.body
-              ? 'Texto limpio y estructurado. Revisa el cuerpo y el material extra antes de guardar.'
-              : 'No se detectó cuerpo principal. Revisa el archivo antes de guardarlo.',
+            text: `Documento procesado exitosamente (${extractedPages.length} páginas detectadas). Puedes revisar y excluir páginas si lo deseas.`,
           });
           finishProgress('complete');
-          setUploadTab('meta');
         } else {
           setUploadedFileName(null);
           setIsbn('');
           setCleanedDocument(null);
           setFullText('');
+          setPagesList([]);
           setStatusMessage({
             type: 'error',
             text: result.message || 'El servicio externo no pudo procesar el PDF.',
@@ -204,6 +250,7 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
         setIsbn('');
         setCleanedDocument(null);
         setFullText('');
+        setPagesList([]);
         setStatusMessage({
           type: 'error',
           text: error instanceof Error
@@ -228,7 +275,7 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
         startProgress('cleaning');
         setStatusMessage({
           type: 'info',
-          text: 'Limpiando texto y separando el cuerpo del material extra...',
+          text: 'Limpiando texto y separando páginas...',
         });
 
         try {
@@ -236,24 +283,32 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
             title: documentTitle,
             author: documentAuthor,
           });
-          const bodyPages = splitTextIntoPages(cleanedResult.structure.body);
+          const formattedText = formatBookDocumentForUpload(cleanedResult.structure);
+          const rawParsed = parseSeparatedPages(formattedText) || splitTextIntoPages(formattedText);
+          const extractedPages: PageItem[] = rawParsed.map((p, idx) => ({
+            id: `page-${idx + 1}-${Date.now()}`,
+            originalIndex: p.numero || idx + 1,
+            texto: p.texto || '',
+            conteo_palabras: p.conteo_palabras || (p.texto || '').trim().split(/\s+/).filter(Boolean).length,
+            eliminada: false,
+          }));
+
           setTitle((current) => current.trim() || cleanName);
           setCleanedDocument(cleanedResult.structure);
-          setFullText(formatBookDocumentForUpload(cleanedResult.structure));
-// Sinopsis se deja libre o se ingresa a mano si el texto plano no tiene sección explícita
+          setFullText(formattedText);
+          setPagesList(extractedPages);
+
           setStatusMessage({
             type: 'success',
-            text: cleanedResult.structure.body
-              ? 'Texto limpio y organizado para su revisión.'
-              : 'No se detectó cuerpo principal. Revisa el archivo antes de guardarlo.',
+            text: `Texto procesado con ${extractedPages.length} páginas. Puedes revisar y excluir páginas si lo deseas.`,
           });
           finishProgress('complete');
-          setUploadTab('meta');
         } catch (error: unknown) {
           setUploadedFileName(null);
           setIsbn('');
           setCleanedDocument(null);
           setFullText('');
+          setPagesList([]);
           setStatusMessage({
             type: 'error',
             text: error instanceof Error
@@ -267,6 +322,7 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
       } else {
         setUploadedFileName(null);
         setIsbn('');
+        setPagesList([]);
         setStatusMessage({
           type: 'error',
           text: 'El archivo no contiene texto legible.',
@@ -277,6 +333,7 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
     reader.onerror = () => {
       setUploadedFileName(null);
       setIsbn('');
+      setPagesList([]);
       setStatusMessage({
         type: 'error',
         text: 'No se pudo leer el archivo seleccionado.',
@@ -292,6 +349,7 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
     setFullText('');
     setCleanedDocument(null);
     setScanResult(null);
+    setPagesList([]);
     setStatusMessage(null);
     setUploadProgress({ stage: 'idle', percent: 0, elapsedSeconds: 0 });
     progressStartedAt.current = null;
@@ -301,6 +359,16 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
     setFullText(text);
     setCleanedDocument(null);
     setScanResult(null);
+    const parsed = parseSeparatedPages(text) || splitTextIntoPages(text);
+    setPagesList(
+      parsed.map((p, idx) => ({
+        id: `page-${idx + 1}-${Date.now()}`,
+        originalIndex: p.numero || idx + 1,
+        texto: p.texto || '',
+        conteo_palabras: (p.texto || '').trim().split(/\s+/).filter(Boolean).length,
+        eliminada: false,
+      }))
+    );
   };
 
   const submitBook = async () => {
@@ -318,7 +386,6 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
         type: 'error',
         text: 'Completa título, autor, género y año con valores válidos.',
       });
-      setUploadTab('meta');
       return;
     }
 
@@ -326,58 +393,89 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
     setStatusMessage(null);
 
     try {
-      // Convertir el texto en páginas estructuradas limpias para MongoDB
-      let uploadText = fullText;
-      let documentForUpload = cleanedDocument;
-      if (fullText.trim() && !cleanedDocument) {
-        const cleanedResult = await cleanAndStructureBookDocumentAsync(fullText, {
-          title: title.trim(),
-          author: author.trim(),
-        });
-        documentForUpload = cleanedResult.structure;
-        setCleanedDocument(cleanedResult.structure);
-        uploadText = formatBookDocumentForUpload(cleanedResult.structure);
-        setFullText(uploadText);
-      }
+      // 1. Obtener páginas elegidas por el usuario (excluyendo las que quitó)
+      const paginasConservadas = pagesList.filter((p) => !p.eliminada);
 
-      const bodyText = documentForUpload?.body ?? uploadText;
-      if (fullText.trim() && !bodyText.trim()) {
+      if (pagesList.length > 0 && paginasConservadas.length === 0) {
         setStatusMessage({
           type: 'error',
-          text: 'No se identificó un cuerpo principal para la obra. Revisa el documento antes de guardarlo.',
+          text: 'Has excluido todas las páginas. Debes conservar al menos una página para guardar la obra.',
         });
         return;
       }
 
-      // Filtrar páginas preliminares (índice, créditos) y remover folios impresos
-      const rawPaginas: Array<{ numero: number; texto: string; conteo_palabras?: number }> = scanResult?.paginas?.length
-        ? scanResult.paginas
-        : uploadText.trim()
+      let paginasFinales: Array<{ numero: number; texto: string; conteo_palabras?: number }> = [];
+
+      if (paginasConservadas.length > 0) {
+        paginasFinales = paginasConservadas.map((p, idx) => {
+          const formatted = formatPageTextStructure(p.texto);
+          return {
+            numero: idx + 1,
+            texto: formatted,
+            conteo_palabras: formatted.split(/\s+/u).filter(Boolean).length,
+          };
+        });
+      } else {
+        // Respaldo de páginas en texto si no vino por lista
+        const uploadText = fullText.trim();
+        const rawPaginas = uploadText
           ? parseSeparatedPages(uploadText) ?? [{
               numero: 1,
-              texto: uploadText.trim(),
-              conteo_palabras: uploadText.trim().split(/\s+/u).filter(Boolean).length,
+              texto: uploadText,
+              conteo_palabras: uploadText.split(/\s+/u).filter(Boolean).length,
             }]
           : [];
+        paginasFinales = cleanAndFilterBookPages(rawPaginas, {
+          title: title.trim(),
+          author: author.trim(),
+        });
+      }
 
-      const paginas = cleanAndFilterBookPages(rawPaginas, {
-        title: title.trim(),
-        author: author.trim(),
-      });
+      if (paginasFinales.length === 0) {
+        setStatusMessage({
+          type: 'error',
+          text: 'No hay páginas de contenido para guardar.',
+        });
+        return;
+      }
 
       const isbnVal = isbn.trim() || generateBookIsbn();
 
-      const savedBook = await createBookApi({
-        title: title.trim(),
-        isbn: isbnVal,
-        author: { name: author.trim() },
-        genres: [genre],
-        publishedYear: year,
-        publisher: publisher.trim() || 'Editorial Babilon',
-        synopsis: synopsis.trim() || 'Sin sinopsis registrada.',
-        pageCount: paginas.length,
-        paginas,
+      setStatusMessage({
+        type: 'info',
+        text: 'Verificando disponibilidad de la base de datos y autorizando con JWT...',
       });
+
+      const securityCheck = await requestUploadSecurityToken();
+      if (!securityCheck.success || !securityCheck.token) {
+        setStatusMessage({
+          type: 'error',
+          text:
+            securityCheck.message ||
+            'No se pudo validar la autorización de seguridad JWT.',
+        });
+        return;
+      }
+
+      setStatusMessage({
+        type: 'info',
+        text: `Guardando obra y ${paginasFinales.length} páginas en la base de datos...`,
+      });
+
+      const savedBook = await createBookApi(
+        {
+          title: title.trim(),
+          isbn: isbnVal,
+          author: { name: author.trim() },
+          genres: [genre],
+          publishedYear: year,
+          publisher: publisher.trim() || 'Editorial Babilon',
+          synopsis: synopsis.trim() || 'Sin sinopsis registrada.',
+          pageCount: paginasFinales.length,
+          paginas: paginasFinales,
+        },
+        securityCheck.token
+      );
 
       if (!savedBook.success) {
         setStatusMessage({
@@ -389,7 +487,7 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
 
       setStatusMessage({
         type: 'success',
-        text: '¡Obra y páginas preservadas exitosamente en el catálogo!',
+        text: `¡Obra preservada exitosamente con ${paginasFinales.length} páginas!`,
       });
       if (onSuccess) setTimeout(onSuccess, 800);
     } catch (error: unknown) {
@@ -406,7 +504,6 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
 
   return {
     state: {
-      uploadTab,
       title,
       author,
       isbn,
@@ -416,6 +513,7 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
       synopsis,
       fullText,
       cleanedDocument,
+      pagesList,
       isSubmitting,
       isScanning,
       uploadProgress,
@@ -424,7 +522,6 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
       statusMessage,
     },
     actions: {
-      setUploadTab,
       setTitle,
       setAuthor,
       setGenre,
@@ -433,6 +530,8 @@ export function useBookUpload({ onSuccess }: UseBookUploadOptions = {}) {
       setSynopsis,
       setFullText: handleTextChange,
       handleFileUpload,
+      togglePageExcluded,
+      restoreAllPages,
       submitBook,
       clearFile,
     },

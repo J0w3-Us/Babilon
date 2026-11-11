@@ -198,16 +198,17 @@ export function MetadataFields({
           </label>
           <input
             id="book-year"
-            type="number"
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
             required
             aria-required="true"
-            step={1}
-            min={-3000}
-            max={new Date().getFullYear() + 2}
-            value={year}
-            onChange={(event) =>
-              onYearChange(event.target.value === '' ? '' : Number(event.target.value))
-            }
+            placeholder="ej. 1943"
+            value={year === '' ? '' : String(year)}
+            onChange={(event) => {
+              const val = event.target.value.replace(/[^0-9]/g, '');
+              onYearChange(val === '' ? '' : Number(val));
+            }}
             className={inputBaseClasses}
           />
         </div>
@@ -364,11 +365,11 @@ export function MetadataFields({
         </label>
         <textarea
           id="book-synopsis"
-          rows={3}
+          rows={7}
           value={synopsis}
           onChange={(event) => onSynopsisChange(event.target.value)}
-          placeholder="Escribe o edita una breve reseña o sinopsis de la obra para orientar a los lectores en el catálogo..."
-          className={`${inputBaseClasses} resize-y min-h-[80px] leading-relaxed`}
+          placeholder="Escribe o edita una reseña o sinopsis de la obra para orientar a los lectores en el catálogo..."
+          className={`${inputBaseClasses} resize-none min-h-[160px] leading-relaxed font-serif`}
         />
       </div>
     </div>

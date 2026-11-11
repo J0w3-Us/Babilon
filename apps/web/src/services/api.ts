@@ -195,23 +195,242 @@ async function getBookPagesFromBookDetail(
   };
 }
 
+export interface AuthUser {
+  id: string;
+  username: string;
+  nombre: string;
+  rol: 'admin' | 'usuario';
+}
+
+export interface AuthActionResult {
+  success: boolean;
+  message?: string;
+  token?: string;
+  expiresAt?: number;
+  user?: AuthUser;
+}
+
+/**
+ * Inicia sesión validando las credenciales contra la colección `usuarios` en MongoDB Atlas.
+ */
+export async function loginUserApi(
+  username: string,
+  password: string
+): Promise<AuthActionResult> {
+  try {
+    const res = await fetch('/api/v1/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+      cache: 'no-store',
+    });
+    const body = (await res.json()) as AuthActionResult;
+    return {
+      ...body,
+      success: Boolean(res.ok && body.success && body.token && body.user),
+      message: body.message || (res.ok ? 'Sesión iniciada' : 'Credenciales inválidas'),
+    };
+  } catch {
+    return {
+      success: false,
+      message: 'No se pudo conectar con el servidor de autenticación.',
+    };
+  }
+}
+
+/**
+ * Crea una nueva cuenta (`admin` o `usuario`) en la colección `usuarios` de MongoDB Atlas.
+ */
+export async function registerUserApi(payload: {
+  username: string;
+  password: string;
+  nombre: string;
+  rol: 'admin' | 'usuario';
+}): Promise<AuthActionResult> {
+  try {
+    const res = await fetch('/api/v1/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      cache: 'no-store',
+    });
+    const body = (await res.json()) as AuthActionResult;
+    return {
+      ...body,
+      success: Boolean(res.ok && body.success && body.token && body.user),
+      message: body.message || (res.ok ? 'Cuenta creada' : 'No se pudo crear la cuenta'),
+    };
+  } catch {
+    return {
+      success: false,
+      message: 'No se pudo conectar con el servidor para registrar la cuenta.',
+    };
+  }
+}
+
+export interface UploadSecurityTokenResult {
+  success: boolean;
+  token?: string;
+  expiresAt?: number;
+  message?: string;
+  health?: {
+    online: boolean;
+    dbConnected: boolean;
+    dbStatus: string;
+  };
+}
+
+/**
+ * Solicita un token JWT firmado (HS256) y valida mediante un ping previo
+ * que la base de datos esté activa antes de permitir la subida del texto.
+ */
+export async function requestUploadSecurityToken(
+  sessionToken?: string | null
+): Promise<UploadSecurityTokenResult> {
+  try {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (sessionToken) {
+      headers['x-babilon-jwt'] = sessionToken;
+    }
+
+    const res = await fetch('/api/v1/auth/upload-token', {
+      method: 'POST',
+      headers,
+      cache: 'no-store',
+    });
+    const body = (await res.json()) as UploadSecurityTokenResult;
+    if (!res.ok || !body.success || !body.token) {
+      return {
+        success: false,
+        message: body.message || 'No se pudo obtener autorización de seguridad JWT para la subida.',
+        health: body.health,
+      };
+    }
+    return body;
+  } catch {
+    return {
+      success: false,
+      message: 'No se pudo contactar al servicio de seguridad pre-subida.',
+    };
+  }
+}
+
+/**
+ * Actualiza los metadatos de un libro existente (Solo Administradores).
+ */
+export async function updateBookApi(
+  bookId: string,
+  updates: {
+    title?: string;
+    authorName?: string;
+    publisher?: string;
+    publishedYear?: number;
+    synopsis?: string;
+    genres?: BookGenre[];
+    isbn?: string;
+  },
+  token: string
+): Promise<{ success: boolean; message?: string }> {
+  const { data, response } = await apiFetch<unknown>(
+    `/api/backend/api/libros/${encodeURIComponent(bookId)}`,
+    {
+      method: 'PUT',
+      headers: {
+        'x-babilon-jwt': token,
+      },
+      body: JSON.stringify(updates),
+    }
+  );
+
+  if (response?.ok && isRecord(data) && data.success === true) {
+    return {
+      success: true,
+      message: getApiMessage(data) || 'Libro actualizado correctamente.',
+    };
+  }
+
+  return {
+    success: false,
+    message:
+      getApiMessage(data) ||
+      (response?.status === 403
+        ? 'Solo los Administradores pueden editar libros.'
+        : 'No se pudo actualizar el libro.'),
+  };
+}
+
+/**
+ * Elimina un libro del catálogo (Solo Administradores).
+ */
+export async function deleteBookApi(
+  bookId: string,
+  token: string
+): Promise<{ success: boolean; message?: string }> {
+  const { data, response } = await apiFetch<unknown>(
+    `/api/backend/api/libros/${encodeURIComponent(bookId)}`,
+    {
+      method: 'DELETE',
+      headers: {
+        'x-babilon-jwt': token,
+      },
+    }
+  );
+
+  if (response?.ok && isRecord(data) && data.success === true) {
+    return {
+      success: true,
+      message: getApiMessage(data) || 'Libro eliminado correctamente.',
+    };
+  }
+
+  return {
+    success: false,
+    message:
+      getApiMessage(data) ||
+      (response?.status === 403
+        ? 'Solo los Administradores pueden eliminar libros.'
+        : 'No se pudo eliminar el libro.'),
+  };
+}
+
 /**
  * Registra o actualiza un libro en la API publicada.
- * Envía metadatos y contenido juntos al endpoint de creación soportado por la API.
+ * Valida la disponibilidad con un ping y resguarda la subida mediante un token JWT firmado.
  */
-export async function createBookApi(book: {
-  title: string;
-  isbn: string;
-  author: { name: string; biography?: string; country?: string };
-  genres: BookGenre[];
-  synopsis: string;
-  publishedYear: number;
-  publisher: string;
-  pageCount: number;
-  paginas?: BookPage[];
-}): Promise<{ success: boolean; bookId?: string; message?: string }> {
-  const { data } = await apiFetch<unknown>('/api/backend/api/libros', {
+export async function createBookApi(
+  book: {
+    title: string;
+    isbn: string;
+    author: { name: string; biography?: string; country?: string };
+    genres: BookGenre[];
+    synopsis: string;
+    publishedYear: number;
+    publisher: string;
+    pageCount: number;
+    paginas?: BookPage[];
+  },
+  uploadToken?: string
+): Promise<{ success: boolean; bookId?: string; message?: string }> {
+  let token = uploadToken;
+
+  if (!token) {
+    const securityCheck = await requestUploadSecurityToken();
+    if (!securityCheck.success || !securityCheck.token) {
+      return {
+        success: false,
+        message:
+          securityCheck.message ||
+          'La verificación de seguridad (JWT / Ping) rechazó la subida.',
+      };
+    }
+    token = securityCheck.token;
+  }
+
+  const { data, response } = await apiFetch<unknown>('/api/backend/api/libros', {
     method: 'POST',
+    headers: {
+      'x-babilon-jwt': token,
+    },
     body: JSON.stringify({
       ...book,
       titulo: book.title,
@@ -225,6 +444,13 @@ export async function createBookApi(book: {
     }),
   });
 
+  if (response?.status === 401) {
+    return {
+      success: false,
+      message: 'Token de seguridad JWT inválido o expirado. Por favor intenta guardar nuevamente.',
+    };
+  }
+
   const createdBook = extractSingleBook(data);
   if ((isRecord(data) && data.success === true) || createdBook) {
     const id = isRecord(data) && typeof data.upsertedId === 'string'
@@ -233,7 +459,7 @@ export async function createBookApi(book: {
     return {
       success: true,
       bookId: typeof id === 'string' ? id : undefined,
-      message: getApiMessage(data) || 'Libro guardado exitosamente en la API de libros',
+      message: getApiMessage(data) || 'Libro guardado exitosamente con verificación JWT',
     };
   }
 

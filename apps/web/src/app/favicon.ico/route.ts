@@ -1,0 +1,21 @@
+import { NextResponse } from 'next/server';
+
+export const runtime = 'edge';
+
+export function GET() {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+    <rect width="32" height="32" rx="8" fill="#1C1917"/>
+    <path d="M7 9C7 7.89543 7.89543 7 9 7H14C15.1046 7 16 7.89543 16 9V24C16 23.2 15.2 22.5 14 22.5H9C7.89543 22.5 7 23.2 7 24V9Z" fill="#C2593F"/>
+    <path d="M25 9C25 7.89543 24.1046 7 23 7H18C16.8954 7 16 7.89543 16 9V24C16 23.2 16.8 22.5 18 22.5H23C24.1046 22.5 25 23.2 25 24V9Z" fill="#D97757"/>
+    <path d="M16 9V24" stroke="#FAF7F2" stroke-width="1.5" stroke-linecap="round"/>
+  </svg>`;
+
+  return new NextResponse(svg, {
+    status: 200,
+    headers: {
+      'Content-Type': 'image/svg+xml',
+      'Cache-Control': 'public, max-age=86400',
+    },
+  });
+}
+

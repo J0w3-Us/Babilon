@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -12,7 +12,6 @@ import {
   UploadCloud,
   CheckCircle2,
   ArrowLeft,
-  X,
 } from 'lucide-react';
 
 import { BookCard } from './BookCard';
@@ -20,13 +19,13 @@ import { BookDetailModal } from './BookDetailModal';
 import { Book } from '@babilon/shared-types';
 import { CatalogFilterDropdown } from './CatalogFilterDropdown';
 import { BookReader } from './BookReader';
-import { BookUploadWizard } from '@/modules/upload/BookUploadWizard';
 import { useBooksCatalog } from './hooks/useBooksCatalog';
 import { useBookReader } from './hooks/useBookReader';
+import { useAuth } from '@/context/AuthContext';
 
 export function BibliotecaView() {
+  const { isAdmin } = useAuth();
   const searchParams = useSearchParams();
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedDetailBook, setSelectedDetailBook] = useState<Book | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -69,13 +68,6 @@ export function BibliotecaView() {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  // Abrir modal si viene el query param ?action=subir
-  useEffect(() => {
-    if (searchParams.get('action') === 'subir') {
-      setIsAddModalOpen(true);
-    }
-  }, [searchParams]);
-
   return (
     <div className="min-h-screen bg-cream-100 dark:bg-surface-50 text-stone-900 dark:text-stone-100 selection:bg-terracotta-100 selection:text-terracotta-900 font-sans pb-16 transition-colors duration-200">
       {/* Toast Alert */}
@@ -111,21 +103,15 @@ export function BibliotecaView() {
               </span>
             )}
 
-            <Link
-              href="/subir"
-              className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-cream-200 dark:bg-surface-200 text-stone-700 dark:text-stone-300 hover:bg-cream-300 dark:hover:bg-surface-300 text-xs font-medium border border-stone-200/80 dark:border-surface-300 transition-colors cursor-pointer"
-            >
-              <UploadCloud size={14} />
-              <span>Página de Subida</span>
-            </Link>
-
-            <button
-              onClick={() => setIsAddModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-stone-900 text-cream-50 hover:bg-stone-800 dark:bg-cream-100 dark:text-stone-900 dark:hover:bg-cream-50 text-xs font-semibold shadow-subtle transition-all cursor-pointer"
-            >
-              <PlusCircle size={14} />
-              <span>Digitalizar Obra</span>
-            </button>
+            {isAdmin && (
+              <Link
+                href="/subir"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-stone-900 text-cream-50 hover:bg-stone-800 dark:bg-cream-100 dark:text-stone-900 dark:hover:bg-cream-50 text-xs font-semibold shadow-subtle transition-all cursor-pointer"
+              >
+                <UploadCloud size={14} />
+                <span>Digitalizar Obra</span>
+              </Link>
+            )}
           </div>
         </div>
       </div>
@@ -224,15 +210,17 @@ export function BibliotecaView() {
               No se hallaron obras registradas
             </h3>
             <p className="text-xs text-stone-500 dark:text-stone-400 mt-1 max-w-sm mx-auto">
-              No hay coincidencias para el criterio actual. Puedes subir y digitalizar una obra nueva de inmediato.
+              No hay coincidencias para el criterio actual.
             </p>
-            <button
-              onClick={() => setIsAddModalOpen(true)}
-              className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-stone-900 text-stone-50 dark:bg-stone-100 dark:text-stone-900 text-xs font-semibold hover:bg-stone-800 dark:hover:bg-white transition-colors cursor-pointer"
-            >
-              <PlusCircle size={14} />
-              Incorporar Libro
-            </button>
+            {isAdmin && (
+              <Link
+                href="/subir"
+                className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-stone-900 text-stone-50 dark:bg-stone-100 dark:text-stone-900 text-xs font-semibold hover:bg-stone-800 dark:hover:bg-white transition-colors cursor-pointer"
+              >
+                <PlusCircle size={14} />
+                <span>Incorporar Libro</span>
+              </Link>
+            )}
           </div>
         ) : (
           <>
@@ -282,6 +270,14 @@ export function BibliotecaView() {
           book={selectedDetailBook}
           onClose={() => setSelectedDetailBook(null)}
           onRead={openBook}
+          onBookUpdated={() => {
+            showToast('¡Metadatos de la obra actualizados exitosamente!');
+            refreshBooks();
+          }}
+          onBookDeleted={() => {
+            showToast('Obra eliminada de la base de datos.');
+            refreshBooks();
+          }}
         />
       )}
 
@@ -308,46 +304,6 @@ export function BibliotecaView() {
           onToggleFullscreen={toggleFullscreen}
           isLoadingPages={reader.isLoadingPages}
         />
-      )}
-
-      {/* Modal de Subida de Libros */}
-      {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white dark:bg-surface-100 rounded-2xl max-w-2xl w-full max-h-[92vh] flex flex-col border border-stone-200 dark:border-surface-300 shadow-2xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-stone-200 dark:border-surface-300 bg-stone-50 dark:bg-surface-200 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <UploadCloud size={18} className="text-terracotta-600 dark:text-terracotta-500" />
-                <div>
-                  <h3 className="font-serif text-lg font-bold text-stone-900 dark:text-stone-100">
-                    Subir y Digitalizar Obra
-                  </h3>
-                  <p className="text-xs text-stone-500 dark:text-stone-400 font-sans">
-                    Persistencia en la API de libros
-                  </p>
-                </div>
-              </div>
-
-              <button
-                onClick={() => setIsAddModalOpen(false)}
-                className="w-7 h-7 rounded-full border border-stone-200 dark:border-surface-300 flex items-center justify-center text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-stone-100 dark:hover:bg-surface-300 transition-colors cursor-pointer"
-              >
-                <X size={15} />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-hidden">
-              <BookUploadWizard
-                isModal={true}
-                onCancel={() => setIsAddModalOpen(false)}
-                onSuccess={() => {
-                  setIsAddModalOpen(false);
-                  showToast('¡Obra agregada exitosamente!');
-                  refreshBooks();
-                }}
-              />
-            </div>
-          </div>
-        </div>
       )}
     </div>
   );

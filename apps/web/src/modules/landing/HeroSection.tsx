@@ -11,8 +11,10 @@ import {
 } from 'lucide-react';
 import { Book } from '@babilon/shared-types';
 import { getBooksApi } from '@/services/api';
+import { useAuth } from '@/context/AuthContext';
 
 export function HeroSection() {
+  const { isAdmin } = useAuth();
   const [featuredBook, setFeaturedBook] = useState<Book | null>(null);
 
   useEffect(() => {
@@ -73,13 +75,15 @@ export function HeroSection() {
                 />
               </Link>
 
-              <Link
-                href="/subir"
-                className="inline-flex items-center gap-2 px-5 py-3.5 rounded-xl bg-cream-50 dark:bg-surface-100 text-stone-700 dark:text-stone-200 font-medium text-sm border border-stone-200/90 dark:border-surface-300 hover:border-terracotta-300 dark:hover:border-surface-400 hover:text-stone-900 dark:hover:text-white transition-all shadow-subtle cursor-pointer"
-              >
-                <UploadCloud size={16} />
-                <span>Digitalizar Obra</span>
-              </Link>
+              {isAdmin && (
+                <Link
+                  href="/subir"
+                  className="inline-flex items-center gap-2 px-5 py-3.5 rounded-xl bg-cream-50 dark:bg-surface-100 text-stone-700 dark:text-stone-200 font-medium text-sm border border-stone-200/90 dark:border-surface-300 hover:border-terracotta-300 dark:hover:border-surface-400 hover:text-stone-900 dark:hover:text-white transition-all shadow-subtle cursor-pointer"
+                >
+                  <UploadCloud size={16} />
+                  <span>Digitalizar Obra</span>
+                </Link>
+              )}
             </div>
 
             {/* Trust Indicators */}

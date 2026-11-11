@@ -1,6 +1,6 @@
 'use client';
 
-import { useLayoutEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { Book, BookPage } from '@babilon/shared-types';
 import {
   BookOpen,
@@ -38,6 +38,8 @@ interface BookReaderProps {
 }
 
 function renderTextoLibro(texto: string): JSX.Element[] {
+  if (!texto) return [];
+
   const parrafos = texto
     .replace(/\r\n?/gu, '\n')
     .split(/\n{2,}/u)
@@ -47,79 +49,54 @@ function renderTextoLibro(texto: string): JSX.Element[] {
   const rendered: JSX.Element[] = [];
   const regexMetadatos =
     /\b(?:traductor(?:a)?|derechos morales|dominio p[uú]blico|isbn|t[ií]tulo original|editorial|copyright)\b|©/iu;
-  const regexNumeroSuelto = /^\d+\s+/u;
-  const regexEncabezado =
-    /^(?:#{1,6}\s*)?(cap[ií]tulo|pr[óo]logo)\s*([IVXLCDM\d]+)?\s*[:.-]?\s*/iu;
-  const regexPersonaje = /^[A-ZÁÉÍÓÚÑ\s]+(?:\([^)]+\))?:/u;
 
   for (let index = 0; index < parrafos.length; index += 1) {
-    let textoUnido = parrafos[index];
+    const textoUnido = parrafos[index];
     if (!textoUnido) continue;
 
-    if (regexNumeroSuelto.test(textoUnido)) {
-      textoUnido = textoUnido.replace(regexNumeroSuelto, '').trim();
-      if (!textoUnido || textoUnido.length < 50) continue;
+    // Omitir bloques de créditos o metadatos de portadilla
+    if (regexMetadatos.test(textoUnido)) continue;
+
+    // 1. ¿Es un título con formato Markdown (### ...) o encabezado de capítulo/sección?
+    const esMarkdownHeading = /^#{1,6}\s+/.test(textoUnido);
+    const esEncabezadoExplicito =
+      /^(?:cap[ií]tulo|chapter|parte|part|libro|book|acto|sinopsis|pr[oó]logo|prefacio|introducci[oó]n|ep[ií]logo|gu[ií]a\s+del\s+lector)\b/iu.test(
+        textoUnido
+      ) ||
+      /^\d{1,3}\.?\s+(?:Sobre\s+|De\s+|En\s+|El\s+|La\s+|Los\s+|Las\s+|[A-ZÁÉÍÓÚÜÑ])[^.!?\n]{2,60}$/u.test(
+        textoUnido
+      ) ||
+      (textoUnido.length <= 60 &&
+        textoUnido === textoUnido.toLocaleUpperCase() &&
+        /[A-ZÁÉÍÓÚÜÑ]/.test(textoUnido) &&
+        !/[.!?…]$/.test(textoUnido));
+
+    if (esMarkdownHeading || esEncabezadoExplicito) {
+      const tituloLimpio = textoUnido.replace(/^#{1,6}\s+/, '').trim();
+      rendered.push(
+        <div key={`heading-wrap-${index}`} className="text-center my-6 sm:my-8 select-none">
+          <h3 className="font-serif font-bold text-lg sm:text-xl tracking-widest uppercase text-[#C2593F] dark:text-[#E07A5F]">
+            {tituloLimpio}
+          </h3>
+          <div className="w-16 h-0.5 bg-[#C2593F]/60 dark:bg-[#E07A5F]/60 mx-auto mt-2.5 mb-6" />
+        </div>
+      );
+      continue;
     }
 
-    // Los créditos suelen estar en bloques propios; "novela" sola también aparece
-    // en prosa narrativa, así que solo cuenta como metadato en una línea de portadilla.
-    const esAtribucionDeNovela =
-      /^(?:la\s+)?novela\b/iu.test(textoUnido) && textoUnido.length < 180;
-    if (regexMetadatos.test(textoUnido) || esAtribucionDeNovela) continue;
-
-    const esTitulo = textoUnido === 'GUÍA DEL LECTOR';
-
-    if (esTitulo) {
+    // 2. ¿Es diálogo con nombre de personaje?
+    if (/^[A-ZÁÉÍÓÚÑ\s]+(?:\([^)]+\))?:/u.test(textoUnido)) {
       rendered.push(
-        <h3 key={`heading-${index}`} className="my-4 text-xl font-bold">
+        <p key={`character-${index}`} className="mb-3.5 text-justify italic opacity-90">
           {textoUnido}
-        </h3>
+        </p>
       );
       continue;
     }
 
-    const encabezado = textoUnido.match(regexEncabezado);
-    if (encabezado) {
-      const titulo = `${encabezado[1]}${encabezado[2] ? ` ${encabezado[2]}` : ''}`.toLocaleUpperCase('es');
-      const cuerpo = textoUnido.slice(encabezado[0].length).trim();
-      rendered.push(
-        <h3 key={`heading-${index}`} className="my-4 text-xl font-bold">
-          {titulo}
-        </h3>
-      );
-      if (cuerpo) {
-        rendered.push(
-          <p key={`chapter-body-${index}`} className="mb-3 text-justify">
-            {cuerpo}
-          </p>
-        );
-      }
-      continue;
-    }
-
-    if (regexPersonaje.test(textoUnido)) {
-      const personajes: string[] = [textoUnido];
-      while (index + 1 < parrafos.length) {
-        const siguiente = parrafos[index + 1];
-        if (!siguiente || !regexPersonaje.test(siguiente)) break;
-        personajes.push(siguiente);
-        index += 1;
-      }
-
-      rendered.push(
-        <ul key={`characters-${index}`} className="mb-3 list-none space-y-2 pl-4">
-          {personajes.map((personaje, characterIndex) => (
-            <li key={`${characterIndex}-${personaje}`} className="text-justify">
-              {personaje}
-            </li>
-          ))}
-        </ul>
-      );
-      continue;
-    }
-
+    // 3. Párrafo narrativo del libro
     rendered.push(
-      <p key={`paragraph-${index}`} className="mb-3 text-justify">
+      <p key={`paragraph-${index}`} className="mb-4 text-justify leading-relaxed indent-4 sm:indent-6">
         {textoUnido}
       </p>
     );
@@ -157,6 +134,41 @@ export function BookReader({
     }
   }, [currentPage]);
 
+  // Bloquear el scroll del fondo mientras el lector está activo
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, []);
+
+  // Navegación con teclado: Flecha Izquierda (anterior), Flecha Derecha (siguiente), Escape (cerrar)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignorar si el usuario está escribiendo en algún control
+      const activeTag = document.activeElement?.tagName;
+      if (activeTag === 'INPUT' || activeTag === 'TEXTAREA' || activeTag === 'SELECT') {
+        return;
+      }
+
+      if (e.key === 'ArrowRight') {
+        if (currentPage < pageCount - 1) {
+          onPageChange(currentPage + 1);
+        }
+      } else if (e.key === 'ArrowLeft') {
+        if (currentPage > 0) {
+          onPageChange(currentPage - 1);
+        }
+      } else if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentPage, pageCount, onPageChange, onClose]);
+
   const currentPageData: BookPage = page ?? {
     numero: currentPage + 1,
     texto: book.synopsis?.trim()
@@ -166,12 +178,15 @@ export function BookReader({
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex items-center justify-center backdrop-blur-xs animate-fade-in ${
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Lector: ${book.title}`}
+      className={`fixed inset-0 z-50 flex items-center justify-center animate-fade-in ${
         isFullscreen ? 'p-0' : 'p-2 sm:p-6'
       } ${
         theme === 'dark'
-          ? 'bg-black/75'
-          : 'bg-black/50'
+          ? 'bg-black/92'
+          : 'bg-black/85'
       }`}
     >
       <div
@@ -293,7 +308,7 @@ export function BookReader({
         {/* Reader Canvas / Document Scroll */}
         <div
           ref={readerScrollRef}
-          className="flex-1 overflow-y-auto px-6 sm:px-16 py-8 sm:py-12 select-text font-serif"
+          className="flex-1 overflow-y-auto px-6 sm:px-16 py-8 sm:py-12 select-text font-serif custom-reader-scrollbar"
         >
           <div className="max-w-2xl mx-auto space-y-6">
             <div className="flex items-center justify-between border-b border-stone-200 dark:border-surface-300 pb-3 mb-6">

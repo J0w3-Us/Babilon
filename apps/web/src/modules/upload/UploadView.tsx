@@ -3,10 +3,12 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { BookUploadWizard } from './BookUploadWizard';
-import { ArrowLeft, UploadCloud, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, UploadCloud, ShieldCheck, Lock, LogIn } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 
 export function UploadView() {
   const router = useRouter();
+  const { user, isAdmin, openAuthModal } = useAuth();
 
   const handleSuccess = () => {
     router.push('/biblioteca');
@@ -33,7 +35,7 @@ export function UploadView() {
 
           <div className="hidden sm:flex items-center gap-2 text-xs text-stone-500 dark:text-stone-400 font-sans">
             <ShieldCheck size={14} className="text-emerald-600 dark:text-emerald-400" />
-            <span>Persistencia mediante la API de libros</span>
+            <span>Subida protegida con JWT (HS256), Ping de salud y Rol Administrador</span>
           </div>
         </div>
       </div>
@@ -53,10 +55,35 @@ export function UploadView() {
           </p>
         </div>
 
-        {/* Tarjeta Principal del Wizard */}
-        <div className="bg-cream-50 dark:bg-surface-100 rounded-2xl border border-stone-200/90 dark:border-surface-300 shadow-card dark:shadow-dark-card overflow-hidden">
-          <BookUploadWizard onSuccess={handleSuccess} />
-        </div>
+        {isAdmin ? (
+          <div className="bg-cream-50 dark:bg-surface-100 rounded-2xl border border-stone-200/90 dark:border-surface-300 shadow-card dark:shadow-dark-card overflow-hidden">
+            <BookUploadWizard onSuccess={handleSuccess} />
+          </div>
+        ) : (
+          <div className="bg-cream-50 dark:bg-surface-100 rounded-2xl border border-stone-200/90 dark:border-surface-300 shadow-card p-8 text-center max-w-xl mx-auto">
+            <div className="w-12 h-12 rounded-2xl bg-terracotta-50 dark:bg-terracotta-950/30 border border-terracotta-200 dark:border-terracotta-800/40 flex items-center justify-center text-terracotta-600 dark:text-terracotta-400 mx-auto mb-4">
+              <Lock size={22} />
+            </div>
+            <h2 className="font-serif text-xl font-bold text-stone-900 dark:text-stone-100">
+              Acceso Exclusivo para Administradores
+            </h2>
+            <p className="text-xs text-stone-600 dark:text-stone-400 mt-2 leading-relaxed">
+              {user
+                ? `Tu cuenta actual (${user.username}) tiene rol de Usuario (solo lectura). Para subir, editar o borrar libros necesitas iniciar sesión o registrar una cuenta de Administrador.`
+                : 'Para digitalizar y subir obras a la base de datos necesitas iniciar sesión con una cuenta de Administrador.'}
+            </p>
+            <div className="mt-5 flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => openAuthModal('login')}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-stone-900 text-cream-50 dark:bg-cream-100 dark:text-stone-900 text-xs font-semibold hover:bg-stone-800 transition-colors cursor-pointer"
+              >
+                <LogIn size={15} />
+                Iniciar Sesión como Administrador
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
