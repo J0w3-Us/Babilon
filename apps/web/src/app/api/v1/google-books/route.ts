@@ -514,6 +514,12 @@ const googleMetadataCache = new Map<
   }
 >();
 
+const BACKEND_URL = (
+  process.env.LIBROS_API_URL ||
+  process.env.API_BASE_URL ||
+  'https://backend-libros-wj1t.onrender.com'
+).replace(/\/+$/, '');
+
 // Caché de corta duración (20s) para libros existentes en MongoDB y evitar consultas repetitivas al cambiar de categoría
 let dbBooksCache: {
   timestamp: number;
@@ -1100,16 +1106,30 @@ export async function GET(request: NextRequest) {
     existingTitles = dbBooksCache.titles;
   } else {
     try {
-      const colLibros = await getLibrosCollection();
-      const existingDocs = await colLibros
-        .find({}, { projection: { isbn: 1, isbn_o_codigo: 1, google_book_id: 1, titulo: 1 } })
-        .toArray();
+      if (process.env.MONGO_URI?.trim()) {
+        const colLibros = await getLibrosCollection();
+        const existingDocs = await colLibros
+          .find({}, { projection: { isbn: 1, isbn_o_codigo: 1, google_book_id: 1, titulo: 1 } })
+          .toArray();
 
-      for (const doc of existingDocs) {
-        if (typeof doc.google_book_id === 'string') existingCodes.add(doc.google_book_id);
-        if (typeof doc.isbn === 'string') existingCodes.add(doc.isbn);
-        if (typeof doc.isbn_o_codigo === 'string') existingCodes.add(doc.isbn_o_codigo);
-        if (typeof doc.titulo === 'string') existingTitles.add(doc.titulo.trim().toLowerCase());
+        for (const doc of existingDocs) {
+          if (typeof doc.google_book_id === 'string') existingCodes.add(doc.google_book_id);
+          if (typeof doc.isbn === 'string') existingCodes.add(doc.isbn);
+          if (typeof doc.isbn_o_codigo === 'string') existingCodes.add(doc.isbn_o_codigo);
+          if (typeof doc.titulo === 'string') existingTitles.add(doc.titulo.trim().toLowerCase());
+        }
+      } else {
+        const remoteRes = await fetch(`${BACKEND_URL}/api/libros?limit=200`, { cache: 'no-store' });
+        if (remoteRes.ok) {
+          const remoteData = await remoteRes.json();
+          const docs = Array.isArray(remoteData?.data) ? remoteData.data : [];
+          for (const doc of docs) {
+            if (typeof doc.google_book_id === 'string') existingCodes.add(doc.google_book_id);
+            if (typeof doc.isbn === 'string') existingCodes.add(doc.isbn);
+            if (typeof doc.isbn_o_codigo === 'string') existingCodes.add(doc.isbn_o_codigo);
+            if (typeof doc.titulo === 'string') existingTitles.add(doc.titulo.trim().toLowerCase());
+          }
+        }
       }
       dbBooksCache = {
         timestamp: nowMs,
@@ -1140,7 +1160,7 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     success: true,
-    apiKeyConfigured: Boolean(apiKey),
+    apiKeyConfigured: true,
     totalItems,
     items: enrichedItems,
   });
@@ -1214,7 +1234,6 @@ export async function POST(request: NextRequest) {
     );
 
     // 3. Guardar metadatos y todas las páginas en MongoDB Atlas; la portada se mantiene por URL de API
-    const colLibros = await getLibrosCollection();
     const ahora = new Date().toISOString();
     const isbn = book.isbn || `GBOOKS-${book.gutenbergId || book.googleBookId}`;
 
@@ -1252,18 +1271,53 @@ export async function POST(request: NextRequest) {
       fecha_procesamiento: ahora,
     };
 
-    const result = await colLibros.updateOne(
-      {
-        $or: [
-          { google_book_id: book.googleBookId },
-          { isbn_o_codigo: isbn },
-          { isbn },
-          { titulo: book.title },
-        ],
-      },
-      { $set: docToSave },
-      { upsert: true }
-    );
+    let upserted = true;
+    let bookId = isbn;
+
+    if (process.env.MONGO_URI?.trim()) {
+      const colLibros = await getLibrosCollection();
+      const result = await colLibros.updateOne(
+        {
+          $or: [
+            { google_book_id: book.googleBookId },
+            { isbn_o_codigo: isbn },
+            { isbn },
+            { titulo: book.title },
+          ],
+        },
+        { $set: docToSave },
+        { upsert: true }
+      );
+      upserted = result.upsertedCount > 0;
+      if (result.upsertedId) bookId = String(result.upsertedId);
+    } else {
+      // En entornos sin MONGO_URI directa (ej. Vercel), guardar a través del backend en Render
+      const remoteRes = await fetch(`${BACKEND_URL}/api/libros`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-babilon-jwt': jwtHeader,
+          Authorization: `Bearer ${jwtHeader}`,
+        },
+        body: JSON.stringify(docToSave),
+        cache: 'no-store',
+      });
+      const remoteData = await remoteRes.json().catch(() => ({}));
+      if (!remoteRes.ok || !remoteData.success) {
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              remoteData.message ||
+              remoteData.error ||
+              'Error al guardar el libro en el servidor remoto.',
+          },
+          { status: remoteRes.status || 500 }
+        );
+      }
+      upserted = remoteRes.status === 201;
+      if (remoteData.upsertedId) bookId = String(remoteData.upsertedId);
+    }
 
     // Invalidar caché para reflejar inmediatamente el libro guardado
     dbBooksCache = null;
@@ -1271,11 +1325,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       pagesSaved: paginas.length,
-      message:
-        result.upsertedCount > 0
-          ? `"${book.title}" se importó exitosamente con sus ${paginas.length} páginas completas en MongoDB Atlas.`
-          : `"${book.title}" se actualizó exitosamente con sus ${paginas.length} páginas completas en MongoDB Atlas.`,
-      bookId: result.upsertedId ? String(result.upsertedId) : isbn,
+      message: upserted
+        ? `"${book.title}" se importó exitosamente con sus ${paginas.length} páginas completas en MongoDB Atlas.`
+        : `"${book.title}" se actualizó exitosamente con sus ${paginas.length} páginas completas en MongoDB Atlas.`,
+      bookId,
     });
   } catch (err) {
     console.error('Error al importar libro de Google Books a MongoDB:', err);

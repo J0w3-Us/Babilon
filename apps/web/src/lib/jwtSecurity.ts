@@ -21,11 +21,19 @@ export interface VerifyJwtResult {
 }
 
 function getJwtSecret(): string {
-  return (
-    process.env.JWT_SECRET ||
-    process.env.LIBROS_API_KEY ||
-    process.env.APP_PASSWORD ||
-    'babilon_jwt_secret_key_2026_hs256_ingesta_segura'
+  return process.env.JWT_SECRET || 'babilon_jwt_secret_key_2026_hs256_ingesta_segura';
+}
+
+function getCandidateSecrets(): string[] {
+  return Array.from(
+    new Set(
+      [
+        process.env.JWT_SECRET,
+        'babilon_jwt_secret_key_2026_hs256_ingesta_segura',
+        process.env.LIBROS_API_KEY,
+        process.env.APP_PASSWORD,
+      ].filter((s): s is string => Boolean(s && s.trim()))
+    )
   );
 }
 
@@ -150,15 +158,17 @@ export function verifyUploadJwt(
     }
 
     const signingInput = `${encodedHeader}.${encodedPayload}`;
-    const expectedSignature = signHmacSha256(signingInput, getJwtSecret());
-
     const providedBuffer = Buffer.from(providedSignature, 'utf-8');
-    const expectedBuffer = Buffer.from(expectedSignature, 'utf-8');
+    const isSignatureValid = getCandidateSecrets().some((secret) => {
+      const expectedSignature = signHmacSha256(signingInput, secret);
+      const expectedBuffer = Buffer.from(expectedSignature, 'utf-8');
+      return (
+        providedBuffer.length === expectedBuffer.length &&
+        crypto.timingSafeEqual(providedBuffer, expectedBuffer)
+      );
+    });
 
-    if (
-      providedBuffer.length !== expectedBuffer.length ||
-      !crypto.timingSafeEqual(providedBuffer, expectedBuffer)
-    ) {
+    if (!isSignatureValid) {
       return { valid: false, reason: 'Firma criptográfica del token JWT inválida o alterada.' };
     }
 

@@ -4,10 +4,16 @@ import { getLibrosCollection } from '@/lib/mongoDb';
 
 export const runtime = 'nodejs';
 
+const BACKEND_URL = (
+  process.env.LIBROS_API_URL ||
+  process.env.API_BASE_URL ||
+  'https://backend-libros-wj1t.onrender.com'
+).replace(/\/+$/, '');
+
 /**
  * Endpoint de seguridad pre-subida:
  * 1. Verifica que la sesión pertenezca a un Administrador ('admin').
- * 2. Ejecuta un Ping preventivo directamente a MongoDB Atlas para comprobar disponibilidad.
+ * 2. Ejecuta un Ping preventivo directamente a MongoDB Atlas o al backend en Render para comprobar disponibilidad.
  * 3. Emite un token JWT firmado (HS256) con vigencia de 15 minutos y alcance 'books:write'.
  */
 export async function POST(request: NextRequest) {
@@ -36,17 +42,26 @@ export async function POST(request: NextRequest) {
       if (check.payload?.nombre) userNombre = check.payload.nombre;
     }
 
-    // 1. Ping preventivo de disponibilidad a MongoDB Atlas
+    // 1. Ping preventivo de disponibilidad a MongoDB Atlas (directo o vía backend Render)
     let online = false;
     let dbConnected = false;
     let dbStatus = 'desconocido';
 
     try {
-      const colLibros = await getLibrosCollection();
-      await colLibros.estimatedDocumentCount();
-      online = true;
-      dbConnected = true;
-      dbStatus = 'conectado';
+      if (process.env.MONGO_URI?.trim()) {
+        const colLibros = await getLibrosCollection();
+        await colLibros.estimatedDocumentCount();
+        online = true;
+        dbConnected = true;
+        dbStatus = 'conectado';
+      } else {
+        const remoteHealth = await fetch(`${BACKEND_URL}/api/salud`, { cache: 'no-store' });
+        if (remoteHealth.ok) {
+          online = true;
+          dbConnected = true;
+          dbStatus = 'conectado';
+        }
+      }
     } catch {
       online = false;
       dbConnected = false;

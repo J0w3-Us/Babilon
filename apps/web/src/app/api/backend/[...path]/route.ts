@@ -350,6 +350,64 @@ async function handleDirectMongo(
   return null;
 }
 
+const BACKEND_URL = (
+  process.env.LIBROS_API_URL ||
+  process.env.API_BASE_URL ||
+  'https://backend-libros-wj1t.onrender.com'
+).replace(/\/+$/, '');
+
+async function proxyToRemoteBackend(
+  request: NextRequest,
+  path: string
+): Promise<NextResponse> {
+  const targetUrl = `${BACKEND_URL}/${path}${request.nextUrl.search}`;
+  const headers = new Headers();
+  headers.set('Accept', 'application/json');
+
+  const contentType = request.headers.get('content-type');
+  if (contentType) {
+    headers.set('Content-Type', contentType);
+  }
+
+  const incomingJwt = request.headers.get('x-babilon-jwt');
+  const incomingAuth = request.headers.get('authorization');
+
+  if (incomingJwt) {
+    headers.set('x-babilon-jwt', incomingJwt);
+    headers.set('Authorization', `Bearer ${incomingJwt.replace(/^Bearer\s+/i, '')}`);
+  } else if (incomingAuth) {
+    headers.set('Authorization', incomingAuth);
+  }
+
+  try {
+    const bodyText =
+      request.method === 'GET' || request.method === 'HEAD'
+        ? undefined
+        : await request.text();
+
+    const response = await fetch(targetUrl, {
+      method: request.method,
+      headers,
+      body: bodyText,
+      cache: 'no-store',
+    });
+
+    const data = await response.text();
+    return new NextResponse(data, {
+      status: response.status,
+      headers: {
+        'content-type': response.headers.get('content-type') || 'application/json',
+      },
+    });
+  } catch (error) {
+    console.error('Error al conectar con el backend remoto en Render:', error);
+    return NextResponse.json(
+      { success: false, message: 'No se pudo conectar con la API de libros.' },
+      { status: 502 }
+    );
+  }
+}
+
 async function proxy(request: NextRequest, { params }: { params: { path: string[] } }) {
   const path = params.path.join('/');
   const isPublicHealthCheck = path === 'api/salud' || path === 'healthz';
@@ -390,15 +448,16 @@ async function proxy(request: NextRequest, { params }: { params: { path: string[
     }
   }
 
-  const directResponse = await handleDirectMongo(request, path);
-  if (directResponse) {
-    return directResponse;
+  // Si MONGO_URI está configurada en el entorno (ej. local), operar directamente contra MongoDB Atlas
+  if (process.env.MONGO_URI?.trim()) {
+    const directResponse = await handleDirectMongo(request, path);
+    if (directResponse) {
+      return directResponse;
+    }
   }
 
-  return NextResponse.json(
-    { success: false, message: `Ruta no encontrada: ${path}` },
-    { status: 404 }
-  );
+  // Si no hay MONGO_URI en el entorno (ej. Vercel), delegar de forma transparente al backend en Render
+  return proxyToRemoteBackend(request, path);
 }
 
 export const GET = proxy;

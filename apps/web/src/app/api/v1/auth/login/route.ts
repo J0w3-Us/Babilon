@@ -4,6 +4,12 @@ import { signUploadJwt, verifyPassword } from '@/lib/jwtSecurity';
 
 export const runtime = 'nodejs';
 
+const BACKEND_URL = (
+  process.env.LIBROS_API_URL ||
+  process.env.API_BASE_URL ||
+  'https://backend-libros-wj1t.onrender.com'
+).replace(/\/+$/, '');
+
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as { username?: string; password?: string };
@@ -17,42 +23,94 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const colUsuarios = await getUsuariosCollection();
-    const userDoc = await colUsuarios.findOne({
-      username_lower: cleanUsername.toLowerCase(),
+    // 1. Si MONGO_URI está configurada directamente (entorno local o servidor con acceso directo)
+    if (process.env.MONGO_URI?.trim()) {
+      try {
+        const colUsuarios = await getUsuariosCollection();
+        const userDoc = await colUsuarios.findOne({
+          username_lower: cleanUsername.toLowerCase(),
+        });
+
+        if (!userDoc || !verifyPassword(cleanPassword, userDoc.password_hash)) {
+          return NextResponse.json(
+            { success: false, message: 'Usuario o contraseña incorrectos.' },
+            { status: 401 }
+          );
+        }
+
+        const ahora = new Date().toISOString();
+        await colUsuarios.updateOne(
+          { username_lower: userDoc.username_lower },
+          { $set: { ultimo_acceso: ahora } }
+        );
+
+        const rol = userDoc.rol === 'admin' ? 'admin' : 'usuario';
+        const { token, expiresAt } = signUploadJwt({
+          subject: userDoc.username,
+          username: userDoc.username,
+          nombre: userDoc.nombre || userDoc.username,
+          rol,
+          scope: rol === 'admin' ? 'books:write' : 'books:read',
+        });
+
+        return NextResponse.json({
+          success: true,
+          message: `Bienvenido, ${userDoc.nombre || userDoc.username}.`,
+          token,
+          expiresAt,
+          user: {
+            id: String(userDoc._id),
+            username: userDoc.username,
+            nombre: userDoc.nombre || userDoc.username,
+            rol,
+          },
+        });
+      } catch (directErr) {
+        console.warn('Fallo conexión directa MongoDB en login; usando backend remoto:', directErr);
+      }
+    }
+
+    // 2. Respaldo automático hacia el backend publicado en Render (para Vercel sin MONGO_URI local)
+    const remoteRes = await fetch(`${BACKEND_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: cleanUsername, password: cleanPassword }),
+      cache: 'no-store',
     });
 
-    if (!userDoc || !verifyPassword(cleanPassword, userDoc.password_hash)) {
+    const remoteData = await remoteRes.json().catch(() => ({}));
+    if (!remoteRes.ok || !remoteData.success) {
       return NextResponse.json(
-        { success: false, message: 'Usuario o contraseña incorrectos.' },
-        { status: 401 }
+        {
+          success: false,
+          message:
+            remoteData.message ||
+            remoteData.error ||
+            'Usuario o contraseña incorrectos.',
+        },
+        { status: remoteRes.status || 401 }
       );
     }
 
-    const ahora = new Date().toISOString();
-    await colUsuarios.updateOne(
-      { username_lower: userDoc.username_lower },
-      { $set: { ultimo_acceso: ahora } }
-    );
-
-    const rol = userDoc.rol === 'admin' ? 'admin' : 'usuario';
+    const remoteUser = remoteData.user || {};
+    const rol = remoteUser.rol === 'admin' ? 'admin' : 'usuario';
     const { token, expiresAt } = signUploadJwt({
-      subject: userDoc.username,
-      username: userDoc.username,
-      nombre: userDoc.nombre || userDoc.username,
+      subject: remoteUser.username || cleanUsername,
+      username: remoteUser.username || cleanUsername,
+      nombre: remoteUser.nombre || cleanUsername,
       rol,
       scope: rol === 'admin' ? 'books:write' : 'books:read',
     });
 
     return NextResponse.json({
       success: true,
-      message: `Bienvenido, ${userDoc.nombre || userDoc.username}.`,
-      token,
-      expiresAt,
+      message: remoteData.message || `Bienvenido, ${remoteUser.nombre || cleanUsername}.`,
+      token: remoteData.token || token,
+      expiresAt: remoteData.expiresAt || expiresAt,
       user: {
-        id: String(userDoc._id),
-        username: userDoc.username,
-        nombre: userDoc.nombre || userDoc.username,
+        id: String(remoteUser.id || remoteUser._id || cleanUsername),
+        username: remoteUser.username || cleanUsername,
+        nombre: remoteUser.nombre || cleanUsername,
         rol,
       },
     });
@@ -67,4 +125,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
