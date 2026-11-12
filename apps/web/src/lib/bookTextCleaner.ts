@@ -46,11 +46,12 @@ const NO_INFERRED_HEADERS = new Set<string>();
 
 const HEADING_LINE_PATTERNS = [
   /^[ \t]*#{1,6}[ \t]+\S+/u,
-  /^[ \t]*(?:cap[ií]tulo|chapter)\s+(?:\d+|[ivxlcdm]+|[a-záéíóúüñ]+)(?:\s*[:\-–—].*)?$/iu,
-  /^[ \t]*(?:parte|part|libro|book|acto|act)\s+(?:\d+|[ivxlcdm]+)(?:\s*[:\-–—].*)?$/iu,
-  /^[ \t]*\d{1,3}\.?\s+[A-ZÁÉÍÓÚÜÑ][^.!?\n]{2,70}$/u,
-  /^[ \t]*[IVXLCDM]{1,6}\.\s+[A-ZÁÉÍÓÚÜÑ][^.!?\n]{2,70}$/u,
-  /^[ \t]*(?:pr[oó]logo|prefacio|introducci[oó]n|ep[ií]logo|sinopsis|dedicatoria|aviso\s+al\s+lector)\b.*$/iu,
+  /^[ \t]*(?:cap[ií]tulo|chapter|canto)\s+(?:\d+|[ivxlcdm]+|[a-záéíóúüñ]+)(?:\s*[:\-–—.].*)?$/iu,
+  /^[ \t]*(?:(?:primera|segunda|tercera|cuarta|quinta)\s+)?(?:parte|part|libro|book|acto|act)(?:\s+(?:\d+|[ivxlcdm]+|[a-záéíóúüñ]+))?(?:\s*[:\-–—.].*)?$/iu,
+  /^[ \t]*[IVXLCDM]{1,7}\.?[ \t]*$/u,
+  /^[ \t]*\d{1,3}\.?\s*(?:[—–\-]\s*)?[A-ZÁÉÍÓÚÜÑ][^!?\n]{2,70}$/u,
+  /^[ \t]*[IVXLCDM]{1,6}\.?\s*(?:[—–\-]\s*)?[A-ZÁÉÍÓÚÜÑ][^!?\n]{2,70}$/u,
+  /^[ \t]*(?:pr[oó]logo|prefacio|introducci[oó]n|ep[ií]logo|sinopsis|dedicatoria|aviso\s+al\s+lector|al\s+lector)\b.*$/iu,
 ];
 
 // Comprueba si una cadena tiene formato de letras espaciadas (ej: "S I N O P S I S")
@@ -135,6 +136,11 @@ export function formatPageTextStructure(text: string): string {
     .replace(/\r\n?/g, '\n')
     .replace(PAGINATION_LINE, '')
     .replace(PAGE_SEPARATOR_LINE, '')
+    .replace(/\[(?:Ilustraci[oó]n|Illustration|Grabado|Figura)[^\]]*\]/giu, '')
+    .replace(/\[\d{1,3}\]/g, '')
+    .replace(/::+/g, '')
+    .replace(/_([^_\n]{1,120})_/g, '$1')
+    .replace(/--/g, '—')
     .split('\n');
 
   const processedLines: string[] = [];

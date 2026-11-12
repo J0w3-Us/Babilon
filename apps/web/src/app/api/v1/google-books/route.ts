@@ -725,34 +725,177 @@ async function enrichWithGoogleBooksApi(
   };
 }
 
+function isTranscriberOrFrontMatterParagraph(p: string): boolean {
+  if (
+    /nota(?:s)?\s+de(?:l)?\s+transc?rip|transcriber|hathitrust|internet\s+archive|distributed\s+proofreading|pgdp\.net|gutenberg|produced\s+by|updated\s+editions/i.test(
+      p
+    )
+  ) {
+    return true;
+  }
+  if (
+    /(?:cursivas|it[aá]licas)\s+(?:se\s+muestran|est[aá]n\s+indicadas|son\s+denotadas)|subrayados|guiones\s+bajos|acento\s+ortogr[aá]fico|transc?ripci[oó]n/i.test(
+      p
+    )
+  ) {
+    return true;
+  }
+  if (
+    /versalitas|errores\s+(?:obvios|evidentes)?\s*de\s+impr|ortograf[ií]a\s+(?:original|del\s+original|de\s+las\s+may[uú]sculas)|tildes\s+a\s+las\s+may[uú]sculas|p[aá]ginas\s+en\s+blanco\s+han\s+sido|ilustraciones\s+(?:se\s+han\s+desplazado|han\s+sido\s+eliminadas)/i.test(
+      p
+    )
+  ) {
+    return true;
+  }
+  if (
+    /se\s+ha\s+a[ñn]adido\s+al\s+final.*[ií]ndice|el\s+[ií]ndice\s+de\s+cap[ií]tulos.*trasladado|se\s+han\s+hecho\s+los\s+siguientes\s+cambios|criterio\s+utilizado\s+para\s+crear\s+la\s+presente\s+versi[oó]n|mapa\s+de\s+diccionarios\s+acad[eé]micos/i.test(
+      p
+    )
+  ) {
+    return true;
+  }
+  if (
+    /^(?:es\s+propiedad|derechos\s+reservados|queda\s+hecho\s+el\s+dep[oó]sito|impreso\s+en|imprenta|establecimiento\s+tipogr[aá]fico|talleres\s+gr[aá]ficos|biblioteca\s+de\s+grandes|obras\s+del\s+mismo\s+autor|en\s+preparaci[oó]n)/i.test(
+      p
+    )
+  ) {
+    return true;
+  }
+  if (
+    /^(?:traducci[oó]n\s+de|versi[oó]n\s+directa|pr[oó]logo\s+de|ilustraciones\s+de|doctor\s+en\s+filosof|catedr[aá]tico\s+de|ram[oó]n\s+sopena|montaner\s+y\s+sim[oó]n|renacimiento|madrid|barcelona|buenos\s+aires)\b/i.test(
+      p
+    ) &&
+    p.length < 260
+  ) {
+    return true;
+  }
+  if (/^\*\s+/.test(p) && p.length < 380) return true;
+  if (/(?:—|--|\.\s*)[IVXLCDM]+\.\s+/.test(p) || (/\s+\d{1,4}$/.test(p) && p.length < 300)) {
+    return true;
+  }
+  if (/^[*_\-=~\s]+$/.test(p)) return true;
+  return false;
+}
+
+function isHardFrontMatterBoundary(p: string): boolean {
+  const trimmed = p.trim();
+  if (
+    /^(?:es\s+propiedad|derechos\s+reservados|queda\s+hecho\s+el\s+dep[oó]sito|imprenta\b|establecimiento\s+tipogr[aá]fico|obras\s+del\s+mismo\s+autor|nota(?:s)?\s+de(?:l)?\s+transc?rip|[ií]ndice(?:\s+general)?|tabla\s+de\s+materias)$/i.test(
+      trimmed
+    )
+  ) {
+    return true;
+  }
+  if (
+    /impresor\s+y\s+editor|tipogr[aá]fico\s+editorial|imprenta\s+renacimiento/i.test(trimmed) &&
+    trimmed.length < 180
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function cleanInlineBookArtifacts(p: string): string {
+  return p
+    .replace(/\[(?:Ilustraci[oó]n|Illustration|Grabado|Figura)[^\]]*\]/giu, '')
+    .replace(/\[\d{1,3}\]/g, '')
+    .replace(/::+/g, '')
+    .replace(/_([^_\n]{1,120})_/g, '$1')
+    .replace(/--/g, '—')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
 /**
- * Limpia encabezados y pies legales en inglés de Project Gutenberg para conservar
- * únicamente el texto literario en español.
+ * Limpia encabezados y pies legales en inglés de Project Gutenberg, notas de transcripción,
+ * portadillas de imprenta e índices para conservar únicamente el texto literario en español.
  */
-function cleanGutenbergFullText(rawText: string): string {
+function extractPureLiteraryParagraphs(
+  rawText: string,
+  bookTitle: string,
+  bookAuthor: string
+): string[] {
   let text = rawText.replace(/\r\n?/g, '\n');
 
-  // Cortar todo lo anterior a *** START OF THE PROJECT GUTENBERG EBOOK ... ***
+  // 1. Cortar todo lo anterior a *** START OF THE PROJECT GUTENBERG EBOOK ... ***
   const startRegex = /\*{3}\s*START OF (?:THE|THIS) PROJECT GUTENBERG EBOOK[^\n]*\*{3}/i;
   const startMatch = startRegex.exec(text);
   if (startMatch && startMatch.index !== undefined) {
     text = text.slice(startMatch.index + startMatch[0].length);
   }
 
-  // Cortar todo lo posterior a *** END OF THE PROJECT GUTENBERG EBOOK ... ***
+  // 2. Cortar todo lo posterior a *** END OF THE PROJECT GUTENBERG EBOOK ... ***
   const endRegex = /\*{3}\s*END OF (?:THE|THIS) PROJECT GUTENBERG EBOOK[^\n]*\*{3}/i;
   const endMatch = endRegex.exec(text);
   if (endMatch && endMatch.index !== undefined) {
     text = text.slice(0, endMatch.index);
   }
 
-  // También cortar variantes antiguas "End of the Project Gutenberg"
   const legacyEndIdx = text.search(/End of (?:the )?Project Gutenberg/i);
   if (legacyEndIdx > 1000) {
     text = text.slice(0, legacyEndIdx);
   }
 
-  return text.trim();
+  const rawParas = text
+    .split(/\n[ \t]*\n+/)
+    .map((p) => cleanInlineBookArtifacts(p.replace(/\s*\n\s*/g, ' ')))
+    .filter(Boolean);
+
+  // 3. Detectar la frontera donde terminan las notas de transcripción, portadillas, imprenta e índice inicial
+  let minStart = 0;
+  for (let i = 0; i < Math.min(rawParas.length, 65); i++) {
+    if (isHardFrontMatterBoundary(rawParas[i])) {
+      minStart = i + 1;
+    }
+  }
+
+  let startIdx = minStart;
+  const titleLower = bookTitle.trim().toLowerCase();
+  const authorLower = bookAuthor.trim().toLowerCase();
+
+  for (let i = minStart; i < Math.min(rawParas.length, 110); i++) {
+    const p = rawParas[i];
+    if (isTranscriberOrFrontMatterParagraph(p)) continue;
+
+    // Párrafo narrativo genuino (>= 130 caracteres con desarrollo en minúsculas)
+    if (
+      p.length >= 130 &&
+      /[a-záéíóúñ]{3,}/u.test(p) &&
+      !/^[A-ZÁÉÍÓÚÑ0-9\s.,;:\-—()«»]+$/u.test(p)
+    ) {
+      startIdx = i;
+      // Incluir 1 o 2 encabezados de capítulo/sección inmediatos (ej. PRÓLOGO, PRIMERA PARTE, I)
+      while (startIdx > minStart) {
+        const prev = rawParas[startIdx - 1];
+        const prevLower = prev.toLowerCase();
+        if (
+          prev.length <= 85 &&
+          !isTranscriberOrFrontMatterParagraph(prev) &&
+          !/^(?:[ií]ndice|p[aá]gina|tabla)/i.test(prev) &&
+          prevLower !== titleLower &&
+          prevLower !== authorLower
+        ) {
+          startIdx--;
+        } else {
+          break;
+        }
+      }
+      break;
+    }
+  }
+
+  // 4. Cortar también índices o notas finales añadidos al final del archivo
+  let endIdx = rawParas.length;
+  for (let i = Math.max(startIdx + 20, rawParas.length - 80); i < rawParas.length; i++) {
+    if (/^(?:[ií]ndice(?:\s+general|\s+de\s+cap[ií]tulos)?|fe\s+de\s+erratas|nota(?:s)?\s+de(?:l)?\s+transc?rip)$/i.test(rawParas[i].trim())) {
+      endIdx = i;
+      break;
+    }
+  }
+
+  return rawParas
+    .slice(startIdx, endIdx)
+    .filter((p) => !isTranscriberOrFrontMatterParagraph(p));
 }
 
 /**
@@ -764,32 +907,10 @@ function paginateFullBookToTargetPages(
   rawFullText: string,
   targetPageCount: number,
   bookTitle: string,
-  synopsisFallback: string
+  synopsisFallback: string,
+  bookAuthor = ''
 ): Array<{ numero: number; texto: string; conteo_palabras: number }> {
-  const cleaned = cleanGutenbergFullText(rawFullText);
-
-  const rawParagraphs = cleaned
-    .split(/\n[ \t]*\n+/)
-    .map((p) => p.replace(/\s*\n\s*/g, ' ').replace(/\s{2,}/g, ' ').trim())
-    .filter((p) => {
-      if (!p) return false;
-      // Omitir créditos técnicos en inglés o notas del transcriptor de digitalización
-      if (
-        /^(?:Produced by|Updated editions|Transcriber's Note|Online Distributed Proofreading|Internet Archive|HathiTrust|www\.gutenberg\.org|www\.pgdp\.net|Se ha respetado la ortograf)/i.test(
-          p
-        )
-      ) {
-        return false;
-      }
-      if (/^Nota del Transcriptor:?/i.test(p) || /^\*\s+En la p\.\s*\d+/i.test(p)) {
-        return false;
-      }
-      // Omitir separadores puros de asteriscos o guiones
-      if (/^[*_\-=~\s]+$/.test(p)) {
-        return false;
-      }
-      return true;
-    });
+  const rawParagraphs = extractPureLiteraryParagraphs(rawFullText, bookTitle, bookAuthor);
 
   // Limitar a un tamaño óptimo (~750 KB máximo de texto puro) para respuesta rápida en MongoDB Atlas
   const MAX_TOTAL_CHARS = 720000;
@@ -1230,7 +1351,8 @@ export async function POST(request: NextRequest) {
       fullText,
       targetPageCount,
       book.title,
-      book.synopsis
+      book.synopsis,
+      book.author
     );
 
     // 3. Guardar metadatos y todas las páginas en MongoDB Atlas; la portada se mantiene por URL de API

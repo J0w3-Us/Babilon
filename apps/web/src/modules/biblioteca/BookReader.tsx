@@ -12,7 +12,9 @@ import {
   Coffee,
   Sun,
   Moon,
+  LogIn,
 } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 
 interface BookReaderProps {
   book: Book;
@@ -42,34 +44,40 @@ function renderTextoLibro(texto: string): JSX.Element[] {
 
   const parrafos = texto
     .replace(/\r\n?/gu, '\n')
+    .replace(/\[(?:Ilustraci[oó]n|Illustration|Grabado|Figura)[^\]]*\]/giu, '')
+    .replace(/\[\d{1,3}\]/g, '')
+    .replace(/::+/g, '')
+    .replace(/_([^_\n]{1,120})_/g, '$1')
+    .replace(/--/g, '—')
     .split(/\n{2,}/u)
     .map((parrafo) => parrafo.replace(/\n/gu, ' ').trim())
     .filter(Boolean);
 
   const rendered: JSX.Element[] = [];
   const regexMetadatos =
-    /\b(?:traductor(?:a)?|derechos morales|dominio p[uú]blico|isbn|t[ií]tulo original|editorial|copyright)\b|©/iu;
+    /\b(?:traductor(?:a)?|derechos morales|dominio p[uú]blico|isbn|t[ií]tulo original|editorial|copyright|nota(?:s)?\s+de(?:l)?\s+transc?rip|transcriber|hathitrust|versalitas|subrayados|guiones\s+bajos|errores\s+(?:obvios|evidentes)?\s*de\s+impr|es\s+propiedad|derechos\s+reservados)\b|©/iu;
 
   for (let index = 0; index < parrafos.length; index += 1) {
     const textoUnido = parrafos[index];
     if (!textoUnido) continue;
 
-    // Omitir bloques de créditos o metadatos de portadilla
+    // Omitir bloques de créditos, notas de transcripción o metadatos de portadilla
     if (regexMetadatos.test(textoUnido)) continue;
 
     // 1. ¿Es un título con formato Markdown (### ...) o encabezado de capítulo/sección?
     const esMarkdownHeading = /^#{1,6}\s+/.test(textoUnido);
     const esEncabezadoExplicito =
-      /^(?:cap[ií]tulo|chapter|parte|part|libro|book|acto|sinopsis|pr[oó]logo|prefacio|introducci[oó]n|ep[ií]logo|gu[ií]a\s+del\s+lector)\b/iu.test(
+      /^(?:(?:primera|segunda|tercera|cuarta|quinta)\s+)?(?:cap[ií]tulo|chapter|canto|parte|part|libro|book|acto|sinopsis|pr[oó]logo|prefacio|introducci[oó]n|ep[ií]logo|al\s+lector|gu[ií]a\s+del\s+lector)\b/iu.test(
         textoUnido
       ) ||
+      /^[IVXLCDM]{1,7}\.?$/u.test(textoUnido) ||
       /^\d{1,3}\.?\s+(?:Sobre\s+|De\s+|En\s+|El\s+|La\s+|Los\s+|Las\s+|[A-ZÁÉÍÓÚÜÑ])[^.!?\n]{2,60}$/u.test(
         textoUnido
       ) ||
       (textoUnido.length <= 60 &&
         textoUnido === textoUnido.toLocaleUpperCase() &&
         /[A-ZÁÉÍÓÚÜÑ]/.test(textoUnido) &&
-        !/[.!?…]$/.test(textoUnido));
+        !/[!?…]$/.test(textoUnido));
 
     if (esMarkdownHeading || esEncabezadoExplicito) {
       const tituloLimpio = textoUnido.replace(/^#{1,6}\s+/, '').trim();
@@ -126,6 +134,7 @@ export function BookReader({
   onToggleFullscreen,
   isLoadingPages = false,
 }: BookReaderProps) {
+  const { user, isAdmin, openAuthModal } = useAuth();
   const readerScrollRef = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
@@ -322,7 +331,7 @@ export function BookReader({
               )}
             </div>
 
-            {savedPageNumber !== null && savedPageNumber > 1 && currentPage === 0 && (
+            {user && !isAdmin && savedPageNumber !== null && savedPageNumber > 1 && currentPage === 0 && (
               <div
                 className="sticky top-2 z-10 -mt-2 mb-5 flex items-center justify-between gap-3 rounded-xl border border-stone-200 bg-cream-50/95 px-3.5 py-2.5 text-xs shadow-sm dark:border-surface-300 dark:bg-surface-100/95"
                 role="status"
@@ -335,14 +344,33 @@ export function BookReader({
                 <button
                   type="button"
                   onClick={onResumeReading}
-                  className="shrink-0 rounded-lg bg-stone-900 px-3 py-2 font-semibold text-cream-50 hover:bg-stone-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-terracotta-600 dark:bg-cream-100 dark:text-stone-900 dark:hover:bg-cream-50"
+                  className="shrink-0 rounded-lg bg-stone-900 px-3 py-2 font-semibold text-cream-50 hover:bg-stone-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-terracotta-600 dark:bg-cream-100 dark:text-stone-900 dark:hover:bg-cream-50 cursor-pointer"
                 >
                   Retomar lectura
                 </button>
               </div>
             )}
 
-            {readingProgressError && (
+            {!user && currentPage === 0 && (
+              <div
+                className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-stone-200/80 bg-cream-100/70 px-3.5 py-2.5 text-xs dark:border-surface-300 dark:bg-surface-100/80"
+                role="status"
+              >
+                <span className="text-stone-600 dark:text-stone-300 font-sans">
+                  Inicia sesión con una cuenta de lector para guardar tu progreso de lectura.
+                </span>
+                <button
+                  type="button"
+                  onClick={() => openAuthModal('login')}
+                  className="inline-flex items-center gap-1.5 shrink-0 rounded-lg border border-stone-300 dark:border-surface-300 bg-white dark:bg-surface-200 px-3 py-1.5 font-sans font-semibold text-stone-800 dark:text-stone-100 hover:bg-stone-100 dark:hover:bg-surface-300 transition-colors cursor-pointer"
+                >
+                  <LogIn size={13} />
+                  <span>Iniciar sesión</span>
+                </button>
+              </div>
+            )}
+
+            {user && !isAdmin && readingProgressError && (
               <p className="mb-4 text-xs text-stone-500 dark:text-stone-400" role="status">
                 {readingProgressError}
               </p>

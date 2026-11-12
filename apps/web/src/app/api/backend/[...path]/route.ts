@@ -43,16 +43,8 @@ async function handleDirectMongo(
         },
       });
     } catch (err) {
-      console.error('Error en chequeo de salud MongoDB:', err);
-      return NextResponse.json(
-        {
-          success: false,
-          status: 'error',
-          message: 'Sin conexión a MongoDB Atlas',
-          database: { connected: false, status: 'sin conexión' },
-        },
-        { status: 503 }
-      );
+      console.warn('Fallo conexión directa MongoDB en /api/salud, usando respaldo Render:', err);
+      return null;
     }
   }
 
@@ -136,11 +128,8 @@ async function handleDirectMongo(
         data: docs,
       });
     } catch (err) {
-      console.error('Error al consultar catálogo en MongoDB Atlas:', err);
-      return NextResponse.json(
-        { success: false, message: 'Error al consultar el catálogo en la base de datos.' },
-        { status: 500 }
-      );
+      console.warn('Fallo consulta directa en MongoDB Atlas (/api/libros), usando respaldo Render:', err);
+      return null;
     }
   }
 
@@ -162,11 +151,8 @@ async function handleDirectMongo(
         data: doc,
       });
     } catch (err) {
-      console.error('Error al obtener detalle del libro en MongoDB Atlas:', err);
-      return NextResponse.json(
-        { success: false, message: 'No se pudo cargar el detalle del libro.' },
-        { status: 500 }
-      );
+      console.warn('Fallo detalle directo en MongoDB Atlas (/api/libros/:id), usando respaldo Render:', err);
+      return null;
     }
   }
 

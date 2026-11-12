@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useAuth } from '@/context/AuthContext';
 
 const STORAGE_KEY_PREFIX = 'babilon:reading-progress:v1:';
 const PROGRESS_CHANGED_EVENT = 'babilon:reading-progress-changed';
@@ -17,11 +18,12 @@ interface UseReadingProgressResult {
   progress: ReadingProgress | null;
   progressPercent: number | null;
   storageError: string | null;
+  canTrackProgress: boolean;
   saveProgress: (pageNumber: number, totalPages: number) => void;
 }
 
-function getStorageKey(bookId: string): string {
-  return `${STORAGE_KEY_PREFIX}${encodeURIComponent(bookId)}`;
+function getStorageKey(username: string, bookId: string): string {
+  return `${STORAGE_KEY_PREFIX}${encodeURIComponent(username.toLowerCase())}:${encodeURIComponent(bookId)}`;
 }
 
 function parseProgress(value: string, bookId: string): ReadingProgress | null {
@@ -63,51 +65,64 @@ function parseProgress(value: string, bookId: string): ReadingProgress | null {
 }
 
 export function useReadingProgress(bookId: string | null): UseReadingProgressResult {
+  const { user, isAdmin } = useAuth();
+  // Solo los usuarios lectores con sesión activa guardan y consultan progreso de lectura (no invitados ni administradores)
+  const canTrackProgress = Boolean(user && !isAdmin && user.rol === 'usuario');
+  const activeUsername = canTrackProgress && user ? user.username : null;
+
   const [storedProgress, setStoredProgress] = useState<ReadingProgress | null>(null);
   const [loadedBookId, setLoadedBookId] = useState<string | null>(null);
   const [storageError, setStorageError] = useState<string | null>(null);
 
-  const readProgress = useCallback((id: string) => {
-    try {
-      const rawProgress = window.localStorage.getItem(getStorageKey(id));
-      if (!rawProgress) {
-        setStoredProgress(null);
+  const readProgress = useCallback(
+    (username: string, id: string) => {
+      try {
+        const rawProgress = window.localStorage.getItem(getStorageKey(username, id));
+        if (!rawProgress) {
+          setStoredProgress(null);
+          setStorageError(null);
+          return;
+        }
+
+        const progress = parseProgress(rawProgress, id);
+        if (!progress) {
+          setStoredProgress(null);
+          setStorageError('El marcador local tiene un formato inválido; la lectura puede continuar.');
+          return;
+        }
+
+        setStoredProgress(progress);
         setStorageError(null);
-        return;
-      }
-
-      const progress = parseProgress(rawProgress, id);
-      if (!progress) {
+      } catch {
         setStoredProgress(null);
-        setStorageError('El marcador local tiene un formato inválido; la lectura puede continuar.');
-        return;
+        setStorageError('No se pudo leer el marcador local; la lectura puede continuar.');
       }
-
-      setStoredProgress(progress);
-      setStorageError(null);
-    } catch {
-      setStoredProgress(null);
-      setStorageError('No se pudo leer el marcador local; la lectura puede continuar.');
-    }
-  }, []);
+    },
+    []
+  );
 
   useEffect(() => {
     setStoredProgress(null);
     setStorageError(null);
     setLoadedBookId(null);
-    if (!bookId) return;
 
-    readProgress(bookId);
+    if (!bookId || !activeUsername) return;
+
+    readProgress(activeUsername, bookId);
     setLoadedBookId(bookId);
 
+    const expectedKey = getStorageKey(activeUsername, bookId);
+
     const handleStorage = (event: StorageEvent) => {
-      if (event.key === getStorageKey(bookId) || event.key === null) {
-        readProgress(bookId);
+      if (event.key === expectedKey || event.key === null) {
+        readProgress(activeUsername, bookId);
       }
     };
     const handleProgressChanged = (event: Event) => {
-      const detail = (event as CustomEvent<ReadingProgress>).detail;
-      if (detail?.bookId === bookId) setStoredProgress(detail);
+      const detail = (event as CustomEvent<ReadingProgress & { username?: string }>).detail;
+      if (detail?.bookId === bookId && detail?.username === activeUsername) {
+        setStoredProgress(detail);
+      }
     };
 
     window.addEventListener('storage', handleStorage);
@@ -116,11 +131,13 @@ export function useReadingProgress(bookId: string | null): UseReadingProgressRes
       window.removeEventListener('storage', handleStorage);
       window.removeEventListener(PROGRESS_CHANGED_EVENT, handleProgressChanged);
     };
-  }, [bookId, readProgress]);
+  }, [bookId, activeUsername, readProgress]);
 
   const saveProgress = useCallback(
     (pageNumber: number, totalPages: number) => {
-      if (!bookId || !Number.isInteger(pageNumber) || pageNumber < 1) return;
+      if (!activeUsername || !bookId || !Number.isInteger(pageNumber) || pageNumber < 1) {
+        return;
+      }
 
       const safeTotalPages = Number.isInteger(totalPages) && totalPages > 0 ? totalPages : 0;
       const progress: ReadingProgress = {
@@ -132,22 +149,24 @@ export function useReadingProgress(bookId: string | null): UseReadingProgressRes
       };
 
       try {
-        window.localStorage.setItem(getStorageKey(bookId), JSON.stringify(progress));
+        window.localStorage.setItem(getStorageKey(activeUsername, bookId), JSON.stringify(progress));
         setStoredProgress(progress);
         setLoadedBookId(bookId);
         setStorageError(null);
         window.dispatchEvent(
-          new CustomEvent<ReadingProgress>(PROGRESS_CHANGED_EVENT, { detail: progress })
+          new CustomEvent(PROGRESS_CHANGED_EVENT, {
+            detail: { ...progress, username: activeUsername },
+          })
         );
       } catch {
         setStorageError('No se pudo guardar el marcador local; la lectura puede continuar.');
       }
     },
-    [bookId]
+    [activeUsername, bookId]
   );
 
   const progress =
-    bookId && loadedBookId === bookId && storedProgress?.bookId === bookId
+    canTrackProgress && bookId && loadedBookId === bookId && storedProgress?.bookId === bookId
       ? storedProgress
       : null;
   const progressPercent =
@@ -155,5 +174,11 @@ export function useReadingProgress(bookId: string | null): UseReadingProgressRes
       ? Math.min(100, Math.round((progress.pageNumber / progress.totalPages) * 100))
       : null;
 
-  return { progress, progressPercent, storageError, saveProgress };
+  return {
+    progress,
+    progressPercent,
+    storageError: canTrackProgress ? storageError : null,
+    canTrackProgress,
+    saveProgress,
+  };
 }

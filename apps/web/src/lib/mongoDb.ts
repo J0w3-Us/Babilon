@@ -1,5 +1,12 @@
+import dns from 'dns';
 import { MongoClient, Db, Collection } from 'mongodb';
 import { hashPassword, UserRole } from './jwtSecurity';
+
+try {
+  dns.setServers(['8.8.8.8', '1.1.1.1', '8.8.4.4']);
+} catch {
+  // Ignorar si el entorno restringe el cambio de servidores DNS
+}
 
 export interface DbUserDocument {
   _id?: unknown;
@@ -31,6 +38,7 @@ async function getMongoClient(): Promise<MongoClient> {
     const client = new MongoClient(MONGO_URI, {
       serverSelectionTimeoutMS: 10000,
       connectTimeoutMS: 10000,
+      family: 4,
     });
     global._babilonMongoClientPromise = client.connect().catch((err) => {
       global._babilonMongoClientPromise = undefined;
