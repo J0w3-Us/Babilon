@@ -50,6 +50,7 @@ export function GoogleBooksExplorerView() {
 
   // Estado de importación por libro
   const [importingId, setImportingId] = useState<string | null>(null);
+  const [failedCovers, setFailedCovers] = useState<Record<string, boolean>>({});
 
   // Modal de previsualización e importación detallada
   const [selectedBook, setSelectedBook] = useState<GoogleBookVolumeItem | null>(null);
@@ -458,14 +459,32 @@ export function GoogleBooksExplorerView() {
                         }}
                         className="relative h-60 w-full bg-cream-200 dark:bg-surface-300 overflow-hidden cursor-pointer"
                       >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={book.coverUrl}
-                          alt={`Portada de ${book.title}`}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                          loading="lazy"
-                          decoding="async"
-                        />
+                        {!failedCovers[book.googleBookId] ? (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img
+                            src={book.coverUrl}
+                            alt={`Portada de ${book.title}`}
+                            onError={() =>
+                              setFailedCovers((prev) => ({
+                                ...prev,
+                                [book.googleBookId]: true,
+                              }))
+                            }
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            loading="lazy"
+                            decoding="async"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex flex-col justify-center items-center p-6 text-center bg-gradient-to-br from-stone-800 via-stone-900 to-black text-cream-50">
+                            <BookOpen size={24} className="text-terracotta-400 mb-2 opacity-80" />
+                            <p className="font-serif text-sm font-bold line-clamp-3 leading-snug">
+                              {book.title}
+                            </p>
+                            <p className="text-[11px] text-stone-300 mt-1 line-clamp-1">
+                              {book.author}
+                            </p>
+                          </div>
+                        )}
                         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
 
                         <div className="absolute top-3 left-3 flex items-center gap-1.5">

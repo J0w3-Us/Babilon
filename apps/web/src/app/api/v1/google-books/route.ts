@@ -62,8 +62,7 @@ const SPANISH_FREE_BOOKS_CATALOG: CuratedSpanishBook[] = [
   },
   {
     gutenbergId: 61851,
-    googleBookId: 'GBOOKS-61851',
-    useGutenbergCover: true,
+    googleBookId: 'l7iJEQAAQBAJ',
     title: 'El crimen y el castigo',
     author: 'Fiódor Dostoyevski',
     publishedYear: 1866,
@@ -75,7 +74,7 @@ const SPANISH_FREE_BOOKS_CATALOG: CuratedSpanishBook[] = [
   },
   {
     gutenbergId: 58221,
-    googleBookId: 'Mu28jqEACAAJ',
+    googleBookId: 'Mu28jgEACAAJ',
     title: 'La Odisea',
     author: 'Homero',
     publishedYear: 1800,
@@ -87,7 +86,7 @@ const SPANISH_FREE_BOOKS_CATALOG: CuratedSpanishBook[] = [
   },
   {
     gutenbergId: 57654,
-    googleBookId: 'n3RCBAAQBAJ',
+    googleBookId: 'n3RCBAAAQBAJ',
     title: 'La Ilíada',
     author: 'Homero',
     publishedYear: 1800,
@@ -135,8 +134,7 @@ const SPANISH_FREE_BOOKS_CATALOG: CuratedSpanishBook[] = [
   },
   {
     gutenbergId: 64974,
-    googleBookId: 'GBOOKS-64974',
-    useGutenbergCover: true,
+    googleBookId: '7SHiEQAAQBAJ',
     title: 'El Hombre Mediocre',
     author: 'José Ingenieros',
     publishedYear: 1913,
@@ -148,8 +146,7 @@ const SPANISH_FREE_BOOKS_CATALOG: CuratedSpanishBook[] = [
   },
   {
     gutenbergId: 22899,
-    googleBookId: 'GBOOKS-22899',
-    useGutenbergCover: true,
+    googleBookId: '-IRIz9vucdUC',
     title: 'Ariel',
     author: 'José Enrique Rodó',
     publishedYear: 1900,
@@ -281,6 +278,7 @@ const SPANISH_FREE_BOOKS_CATALOG: CuratedSpanishBook[] = [
   },
   {
     gutenbergId: 1619,
+    googleBookId: 'pQygEQAAQBAJ',
     title: 'La Celestina',
     author: 'Fernando de Rojas',
     publishedYear: 1499,
@@ -292,6 +290,7 @@ const SPANISH_FREE_BOOKS_CATALOG: CuratedSpanishBook[] = [
   },
   {
     gutenbergId: 16625,
+    googleBookId: 'tKJjDwAAQBAJ',
     title: 'Libro de Buen Amor',
     author: 'Juan Ruiz (Arcipreste de Hita)',
     publishedYear: 1330,
@@ -303,6 +302,7 @@ const SPANISH_FREE_BOOKS_CATALOG: CuratedSpanishBook[] = [
   },
   {
     gutenbergId: 50027,
+    googleBookId: 'bbjKAQAAQBAJ',
     title: 'El sí de las niñas',
     author: 'Leandro Fernández de Moratín',
     publishedYear: 1806,
@@ -314,6 +314,7 @@ const SPANISH_FREE_BOOKS_CATALOG: CuratedSpanishBook[] = [
   },
   {
     gutenbergId: 14765,
+    googleBookId: 'SuvRJ2ZJFBsC',
     title: 'El Gaucho Martín Fierro',
     author: 'José Hernández',
     publishedYear: 1872,
@@ -325,6 +326,7 @@ const SPANISH_FREE_BOOKS_CATALOG: CuratedSpanishBook[] = [
   },
   {
     gutenbergId: 55206,
+    googleBookId: '1I0NAAAAYAAJ',
     title: 'Fábulas en verso castellano',
     author: 'Félix María de Samaniego',
     publishedYear: 1781,
@@ -336,6 +338,7 @@ const SPANISH_FREE_BOOKS_CATALOG: CuratedSpanishBook[] = [
   },
   {
     gutenbergId: 45438,
+    googleBookId: '7OJKEAAAQBAJ',
     title: 'La isla del tesoro',
     author: 'Robert Louis Stevenson',
     publishedYear: 1883,
@@ -347,6 +350,7 @@ const SPANISH_FREE_BOOKS_CATALOG: CuratedSpanishBook[] = [
   },
   {
     gutenbergId: 69552,
+    googleBookId: 'F0zZDgAAQBAJ',
     title: 'El libro de las tierras vírgenes',
     author: 'Rudyard Kipling',
     publishedYear: 1894,
@@ -358,6 +362,7 @@ const SPANISH_FREE_BOOKS_CATALOG: CuratedSpanishBook[] = [
   },
   {
     gutenbergId: 47287,
+    googleBookId: 'gqJjDwAAQBAJ',
     title: 'El libro de las mil noches y una noche',
     author: 'Anónimo (Trad. Vicente Blasco Ibáñez)',
     publishedYear: 1899,
@@ -369,6 +374,7 @@ const SPANISH_FREE_BOOKS_CATALOG: CuratedSpanishBook[] = [
   },
   {
     gutenbergId: 79356,
+    googleBookId: '6OVWAAAAYAAJ',
     title: 'Nuestra Señora de París',
     author: 'Victor Hugo',
     publishedYear: 1831,
@@ -380,6 +386,7 @@ const SPANISH_FREE_BOOKS_CATALOG: CuratedSpanishBook[] = [
   },
   {
     gutenbergId: 78068,
+    googleBookId: 'VXRCBAAAQBAJ',
     title: 'Los miserables',
     author: 'Victor Hugo',
     publishedYear: 1862,
@@ -391,6 +398,7 @@ const SPANISH_FREE_BOOKS_CATALOG: CuratedSpanishBook[] = [
   },
   {
     gutenbergId: 17013,
+    googleBookId: 'xcfgDwAAQBAJ',
     title: 'Fortunata y Jacinta',
     author: 'Benito Pérez Galdós',
     publishedYear: 1887,
@@ -402,6 +410,7 @@ const SPANISH_FREE_BOOKS_CATALOG: CuratedSpanishBook[] = [
   },
   {
     gutenbergId: 15725,
+    googleBookId: 'Cvc6EAAAQBAJ',
     title: 'Doña Perfecta',
     author: 'Benito Pérez Galdós',
     publishedYear: 1876,
@@ -413,6 +422,7 @@ const SPANISH_FREE_BOOKS_CATALOG: CuratedSpanishBook[] = [
   },
   {
     gutenbergId: 16961,
+    googleBookId: 'niNpEAAAQBAJ',
     title: 'Trafalgar (Episodios Nacionales)',
     author: 'Benito Pérez Galdós',
     publishedYear: 1873,
@@ -424,6 +434,7 @@ const SPANISH_FREE_BOOKS_CATALOG: CuratedSpanishBook[] = [
   },
   {
     gutenbergId: 33267,
+    googleBookId: 'RQ6tDwAAQBAJ',
     title: 'Facundo: Civilización y Barbarie',
     author: 'Domingo Faustino Sarmiento',
     publishedYear: 1845,
@@ -435,6 +446,7 @@ const SPANISH_FREE_BOOKS_CATALOG: CuratedSpanishBook[] = [
   },
   {
     gutenbergId: 49298,
+    googleBookId: 'JTAg6ZwiK9gC',
     title: 'Historia de las Indias',
     author: 'Bartolomé de las Casas',
     publishedYear: 1561,
@@ -446,6 +458,7 @@ const SPANISH_FREE_BOOKS_CATALOG: CuratedSpanishBook[] = [
   },
   {
     gutenbergId: 56251,
+    googleBookId: 'VPiOEQAAQBAJ',
     title: 'Compendio de la historia general de América',
     author: 'Carlos Navarro y Lamarca',
     publishedYear: 1910,
@@ -457,6 +470,7 @@ const SPANISH_FREE_BOOKS_CATALOG: CuratedSpanishBook[] = [
   },
   {
     gutenbergId: 25988,
+    googleBookId: 'Kd0bEQAAQBAJ',
     title: 'Historia de la literatura y del arte dramático en España',
     author: 'Adolf Friedrich von Schack',
     publishedYear: 1885,
@@ -468,6 +482,7 @@ const SPANISH_FREE_BOOKS_CATALOG: CuratedSpanishBook[] = [
   },
   {
     gutenbergId: 26284,
+    googleBookId: 'eb1JswEACAAJ',
     title: 'El Mar (Estudio de Historia Natural)',
     author: 'Jules Michelet',
     publishedYear: 1861,
@@ -479,6 +494,7 @@ const SPANISH_FREE_BOOKS_CATALOG: CuratedSpanishBook[] = [
   },
   {
     gutenbergId: 29506,
+    googleBookId: 'fSqAAQAAQBAJ',
     title: 'El sombrero de tres picos',
     author: 'Pedro Antonio de Alarcón',
     publishedYear: 1874,
@@ -490,6 +506,7 @@ const SPANISH_FREE_BOOKS_CATALOG: CuratedSpanishBook[] = [
   },
   {
     gutenbergId: 18005,
+    googleBookId: 'ZeaLAQAAQBAJ',
     title: 'Los pazos de Ulloa',
     author: 'Emilia Pardo Bazán',
     publishedYear: 1886,
@@ -562,9 +579,9 @@ async function enrichWithGoogleBooksApi(
   book: CuratedSpanishBook,
   apiKey: string
 ): Promise<GoogleBookVolumeItem> {
-  const fallbackCover = `https://www.gutenberg.org/cache/epub/${book.gutenbergId}/pg${book.gutenbergId}.cover.medium.jpg`;
-  const fullTextUrl = `https://www.gutenberg.org/ebooks/${book.gutenbergId}.txt.utf-8`;
-  const epubDownloadLink = `https://www.gutenberg.org/ebooks/${book.gutenbergId}.epub3.images`;
+  const fallbackCover = `https://gutenberg.pglaf.org/cache/epub/${book.gutenbergId}/pg${book.gutenbergId}.cover.medium.jpg`;
+  const fullTextUrl = `https://gutenberg.pglaf.org/cache/epub/${book.gutenbergId}/pg${book.gutenbergId}.txt`;
+  const epubDownloadLink = `https://gutenberg.pglaf.org/cache/epub/${book.gutenbergId}/pg${book.gutenbergId}-images.epub3`;
 
   // Si es una obra del catálogo base, evitamos hacer peticiones en cascada a Google Books API
   if (!book.isDynamic) {
@@ -1019,37 +1036,57 @@ function paginateFullBookToTargetPages(
   return pages;
 }
 
+function buildGutenbergMirrorDir(id: number): string {
+  const s = String(id);
+  if (s.length <= 1) return `0/${s}`;
+  return `${s.slice(0, -1).split('').join('/')}/${s}`;
+}
+
 /**
- * Descarga el texto completo de la obra desde su URL UTF-8 o busca su equivalente en Gutendex
+ * Descarga el texto completo de la obra desde espejos oficiales de alta disponibilidad
+ * (PGLAF, XMission, MirrorService) o busca su equivalente en Gutendex / Internet Archive.
  */
 async function downloadFullBookText(book: GoogleBookVolumeItem): Promise<string> {
   const candidateUrls: string[] = [];
 
-  if (book.fullTextUrl) {
-    candidateUrls.push(book.fullTextUrl);
-  }
-
-  // Extraer gutenbergId si viene en el objeto o en el código ISBN/ID
+  // Extraer gutenbergId desde el objeto, el catálogo base o el código ISBN
+  const isbnNumeric = Number((book.isbn || '').replace(/^GBOOKS-/i, '').replace(/\D+/g, ''));
+  const catalogMatch = SPANISH_FREE_BOOKS_CATALOG.find(
+    (b) =>
+      b.googleBookId === book.googleBookId ||
+      b.title.toLowerCase() === book.title.toLowerCase()
+  );
   const inferredId =
     book.gutenbergId ||
-    Number(book.googleBookId.replace(/\D+/g, '')) ||
-    SPANISH_FREE_BOOKS_CATALOG.find(
-      (b) => b.title.toLowerCase() === book.title.toLowerCase()
-    )?.gutenbergId;
+    catalogMatch?.gutenbergId ||
+    (isbnNumeric > 0 ? isbnNumeric : undefined);
 
   if (inferredId && Number.isFinite(inferredId) && inferredId > 0) {
+    const mirrorDir = buildGutenbergMirrorDir(inferredId);
+    // Espejos oficiales de alta velocidad (no bloquean IPs de Vercel ni devuelven 503)
+    candidateUrls.push(`https://gutenberg.pglaf.org/cache/epub/${inferredId}/pg${inferredId}.txt`);
+    candidateUrls.push(`https://mirrors.xmission.com/gutenberg/${mirrorDir}/${inferredId}-0.txt`);
+    candidateUrls.push(
+      `https://www.mirrorservice.org/sites/ftp.ibiblio.org/pub/docs/books/gutenberg/${mirrorDir}/${inferredId}-0.txt`
+    );
+    candidateUrls.push(`https://gutenberg.pglaf.org/${mirrorDir}/${inferredId}-0.txt`);
+    candidateUrls.push(`https://gutenberg.pglaf.org/${mirrorDir}/${inferredId}-8.txt`);
+    candidateUrls.push(`https://gutenberg.pglaf.org/${mirrorDir}/${inferredId}.txt`);
     candidateUrls.push(`https://www.gutenberg.org/ebooks/${inferredId}.txt.utf-8`);
-    candidateUrls.push(`https://www.gutenberg.org/files/${inferredId}/${inferredId}-0.txt`);
     candidateUrls.push(`https://www.gutenberg.org/cache/epub/${inferredId}/pg${inferredId}.txt`);
+  }
+
+  if (book.fullTextUrl && !candidateUrls.includes(book.fullTextUrl)) {
+    candidateUrls.push(book.fullTextUrl);
   }
 
   for (const url of candidateUrls) {
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 12000);
+      const timeout = setTimeout(() => controller.abort(), 9000);
       const res = await fetch(url, {
         signal: controller.signal,
-        headers: { 'User-Agent': 'Babilon-Digital-Library/1.0' },
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; BabilonDigitalLibrary/1.0)' },
       });
       clearTimeout(timeout);
 
@@ -1079,19 +1116,34 @@ async function downloadFullBookText(book: GoogleBookVolumeItem): Promise<string>
       const firstTextBook = (data?.results || []).find(
         (b: any) =>
           b.media_type === 'Text' &&
-          (b.formats?.['text/plain; charset=utf-8'] || b.formats?.['text/plain; charset=us-ascii'])
+          (b.id ||
+            b.formats?.['text/plain; charset=utf-8'] ||
+            b.formats?.['text/plain; charset=us-ascii'])
       );
+      const dynamicUrls: string[] = [];
+      if (firstTextBook?.id) {
+        dynamicUrls.push(
+          `https://gutenberg.pglaf.org/cache/epub/${firstTextBook.id}/pg${firstTextBook.id}.txt`
+        );
+      }
       const txtUrl =
         firstTextBook?.formats?.['text/plain; charset=utf-8'] ||
         firstTextBook?.formats?.['text/plain; charset=us-ascii'];
-
       if (txtUrl) {
-        const txtRes = await fetch(txtUrl);
-        if (txtRes.ok) {
-          const text = await txtRes.text();
-          if (text && text.length > 2500) {
-            return text;
+        dynamicUrls.push(txtUrl);
+      }
+
+      for (const dUrl of dynamicUrls) {
+        try {
+          const txtRes = await fetch(dUrl);
+          if (txtRes.ok) {
+            const text = await txtRes.text();
+            if (text && text.length > 2500 && !text.trim().startsWith('<!DOCTYPE')) {
+              return text;
+            }
           }
+        } catch {
+          // continuar
         }
       }
     }
