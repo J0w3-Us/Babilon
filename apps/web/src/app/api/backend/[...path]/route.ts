@@ -16,6 +16,7 @@ import { verifyUploadJwt } from '@/lib/jwtSecurity';
 import { getLibrosCollection } from '@/lib/mongoDb';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -358,7 +359,14 @@ async function proxyToRemoteBackend(
   request: NextRequest,
   path: string
 ): Promise<NextResponse> {
-  const targetUrl = `${BACKEND_URL}/${path}${request.nextUrl.search}`;
+  const searchParams = new URLSearchParams(request.nextUrl.searchParams);
+  if (path === 'api/libros' && searchParams.has('cursor') && !searchParams.has('skip')) {
+    const cursorAsSkip = Math.max(0, Number(searchParams.get('cursor')) || 0);
+    searchParams.set('skip', String(cursorAsSkip));
+    searchParams.delete('cursor');
+  }
+  const queryString = searchParams.toString();
+  const targetUrl = `${BACKEND_URL}/${path}${queryString ? `?${queryString}` : ''}`;
   const headers = new Headers();
   headers.set('Accept', 'application/json');
 

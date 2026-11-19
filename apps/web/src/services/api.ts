@@ -14,6 +14,8 @@ export interface FetchBooksResult {
   total: number;
   storage: 'api' | 'memory-fallback' | 'fallback';
   online: boolean;
+  skip?: number;
+  limit?: number;
   hasMore?: boolean;
   nextCursor?: string | null;
 }
@@ -79,6 +81,7 @@ export async function getBooksApi(params?: {
   authors?: string[];
   featured?: boolean;
   limit?: number;
+  skip?: number;
   cursor?: string | null;
 }): Promise<FetchBooksResult> {
   const queryParams = new URLSearchParams();
@@ -90,29 +93,49 @@ export async function getBooksApi(params?: {
   if (params?.featured) {
     queryParams.append('featured', 'true');
   }
-  const limit = params?.limit ?? 20;
+  const limit = Math.max(1, params?.limit ?? 20);
   queryParams.append('limit', String(limit));
-  if (params?.cursor) queryParams.append('cursor', params.cursor);
+
+  const resolvedSkip =
+    typeof params?.skip === 'number' && Number.isFinite(params.skip)
+      ? Math.max(0, Math.floor(params.skip))
+      : params?.cursor
+        ? Math.max(0, Number(params.cursor) || 0)
+        : 0;
+
+  if (resolvedSkip > 0 || typeof params?.skip === 'number') {
+    queryParams.append('skip', String(resolvedSkip));
+  }
 
   const endpoint = `/api/backend/api/libros${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-  const { data } = await apiFetch<unknown>(endpoint);
+  const { data } = await apiFetch<unknown>(endpoint, { cache: 'no-store' });
   const rawBooks = extractBooks(data);
 
   if (rawBooks) {
     const books = rawBooks.map((book) => normalizeBook(book));
 
-    const totalFromServer = isRecord(data) && typeof data.total === 'number' ? data.total : books.length;
-    const hasMoreFromServer = isRecord(data) && typeof data.hasMore === 'boolean'
-      ? data.hasMore
-      : false;
+    const skipFromServer =
+      isRecord(data) && typeof data.skip === 'number' ? data.skip : resolvedSkip;
+    const totalFromServer =
+      isRecord(data) && typeof data.total === 'number' ? data.total : books.length;
+    const hasMoreFromServer =
+      isRecord(data) && typeof data.hasMore === 'boolean'
+        ? data.hasMore
+        : skipFromServer + books.length < totalFromServer;
+    const nextCursorFromServer =
+      isRecord(data) && typeof data.nextCursor === 'string'
+        ? data.nextCursor
+        : hasMoreFromServer
+          ? String(skipFromServer + books.length)
+          : null;
 
     return {
       books,
       total: totalFromServer,
+      skip: skipFromServer,
+      limit,
       hasMore: hasMoreFromServer,
-      nextCursor: isRecord(data) && typeof data.nextCursor === 'string'
-        ? data.nextCursor
-        : null,
+      nextCursor: nextCursorFromServer,
       storage: 'api',
       online: true,
     };
@@ -121,6 +144,8 @@ export async function getBooksApi(params?: {
   return {
     books: [],
     total: 0,
+    skip: resolvedSkip,
+    limit,
     hasMore: false,
     nextCursor: null,
     storage: 'fallback',

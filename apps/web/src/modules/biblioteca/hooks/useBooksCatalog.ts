@@ -3,11 +3,11 @@
  * BUSCADOR AVANZADO & PAGINACIÓN DE RED
  * HITO 2.1: Desarrollo de inputs y filtros dinámicos combinados
  * HITO 2.2: Consultas por palabras clave con debounce y sanitización
- * HITO 2.3: Configuración del sistema de paginación de red (limit, skip y cursor)
+ * HITO 2.3: Configuración del sistema de paginación de red (limit y skip)
  * ============================================================================
  * - Control de búsqueda reactiva con debounce (280ms) para evitar saturación de sockets.
  * - Combinación de criterios en condición AND (búsqueda textual + categorías + autores).
- * - Entrega por bloques controlados (PAGE_SIZE = 20) con cursor estable para evitar desbordamiento.
+ * - Paginación estricta por páginas de 20 obras (PAGE_SIZE = 20) compatible con MongoDB y Render.
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -32,16 +32,28 @@ function toggleValue(values: string[], value: string): string[] {
     : [...values, value];
 }
 
-function syncUrl(query: string, categories: string[], authors: string[]) {
+function normalizePage(page: number): number {
+  if (!Number.isFinite(page)) return 1;
+  return Math.max(1, Math.floor(page));
+}
+
+function syncUrl(
+  query: string,
+  categories: string[],
+  authors: string[],
+  page: number
+) {
   if (typeof window === 'undefined') return;
 
   const url = new URL(window.location.href);
   url.searchParams.delete('q');
   url.searchParams.delete('category');
   url.searchParams.delete('author');
+  url.searchParams.delete('page');
   if (query.trim()) url.searchParams.set('q', query.trim());
   categories.forEach((category) => url.searchParams.append('category', category));
   authors.forEach((author) => url.searchParams.append('author', author));
+  if (page > 1) url.searchParams.set('page', String(page));
   window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
 }
 
@@ -50,14 +62,17 @@ export function useBooksCatalog({
   initialQuery = '',
   initialCategories = [],
   initialAuthors = [],
+  initialPage = 1,
 }: {
   debounceMs?: number;
   initialQuery?: string;
   initialCategories?: string[];
   initialAuthors?: string[];
+  initialPage?: number;
 } = {}) {
   const [books, setBooks] = useState<Book[]>([]);
   const [searchTerm, setSearchTerm] = useState(initialQuery);
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(initialQuery);
   const [selectedCategories, setSelectedCategories] = useState(initialCategories);
   const [selectedAuthors, setSelectedAuthors] = useState(initialAuthors);
   const [draftCategories, setDraftCategories] = useState(initialCategories);
@@ -66,13 +81,12 @@ export function useBooksCatalog({
   const [authorSearch, setAuthorSearch] = useState('');
   const [filterMenuOpen, setFilterMenuOpen] = useState(false);
   const [knownAuthors, setKnownAuthors] = useState<CatalogAuthorOption[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [health, setHealth] = useState<HealthInfo | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [totalCount, setTotalCount] = useState<number>(0);
+  const [currentPage, setCurrentPage] = useState<number>(() => normalizePage(initialPage));
   const [hasMore, setHasMore] = useState(false);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const requestId = useRef(0);
 
   const rememberAuthors = useCallback((booksToRemember: Book[]) => {
@@ -92,22 +106,35 @@ export function useBooksCatalog({
 
   const fetchBooks = useCallback(async () => {
     const activeRequest = ++requestId.current;
+    const skip = (currentPage - 1) * PAGE_SIZE;
+
     setLoading(true);
     setErrorMessage(null);
     try {
       const result = await getBooksApi({
-        query: searchTerm,
+        query: debouncedSearchTerm,
         categories: selectedCategories,
         authors: selectedAuthors,
         limit: PAGE_SIZE,
+        skip,
       });
       if (activeRequest !== requestId.current) return;
+
+      if (!result.online) {
+        setErrorMessage('Error al conectar con la API de libros de Babilon.');
+        return;
+      }
+
+      const computedTotalPages = Math.max(1, Math.ceil(result.total / PAGE_SIZE));
+      if (result.total > 0 && currentPage > computedTotalPages) {
+        setCurrentPage(computedTotalPages);
+        return;
+      }
 
       rememberAuthors(result.books);
       setBooks(result.books);
       setTotalCount(result.total);
-      setHasMore(result.hasMore ?? false);
-      setNextCursor(result.nextCursor ?? null);
+      setHasMore(result.hasMore ?? skip + result.books.length < result.total);
     } catch {
       if (activeRequest === requestId.current) {
         setErrorMessage('Error al conectar con la API de libros de Babilon.');
@@ -115,45 +142,16 @@ export function useBooksCatalog({
     } finally {
       if (activeRequest === requestId.current) setLoading(false);
     }
-  }, [rememberAuthors, searchTerm, selectedAuthors, selectedCategories]);
+  }, [currentPage, debouncedSearchTerm, rememberAuthors, selectedAuthors, selectedCategories]);
 
-  const loadMoreBooks = useCallback(async () => {
-    if (loadingMore || !hasMore || !nextCursor) return;
-    const activeRequest = requestId.current;
-    setLoadingMore(true);
-    setErrorMessage(null);
-    try {
-      const result = await getBooksApi({
-        query: searchTerm,
-        categories: selectedCategories,
-        authors: selectedAuthors,
-        limit: PAGE_SIZE,
-        cursor: nextCursor,
-      });
-      if (activeRequest !== requestId.current) return;
-      rememberAuthors(result.books);
-      setBooks((previous) => {
-        const existingIds = new Set(previous.map((book) => book.id));
-        return [...previous, ...result.books.filter((book) => !existingIds.has(book.id))];
-      });
-      setHasMore(result.hasMore ?? false);
-      setNextCursor(result.nextCursor ?? null);
-    } catch {
-      if (activeRequest === requestId.current) {
-        setErrorMessage('No se pudieron cargar más libros. Inténtalo de nuevo.');
-      }
-    } finally {
-      if (activeRequest === requestId.current) setLoadingMore(false);
-    }
-  }, [
-    hasMore,
-    loadingMore,
-    nextCursor,
-    rememberAuthors,
-    searchTerm,
-    selectedAuthors,
-    selectedCategories,
-  ]);
+  useEffect(() => {
+    if (searchTerm === debouncedSearchTerm) return;
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+      setCurrentPage(1);
+    }, debounceMs);
+    return () => clearTimeout(timer);
+  }, [searchTerm, debouncedSearchTerm, debounceMs]);
 
   const beginFilterDraft = useCallback(() => {
     setDraftCategories(selectedCategories);
@@ -170,6 +168,7 @@ export function useBooksCatalog({
   const applyFilterDraft = useCallback(() => {
     setSelectedCategories(draftCategories);
     setSelectedAuthors(draftAuthors);
+    setCurrentPage(1);
     setFilterMenuOpen(false);
   }, [draftAuthors, draftCategories]);
 
@@ -178,16 +177,34 @@ export function useBooksCatalog({
     setAuthorLabels((previous) => ({ ...previous, [value]: label }));
   }, []);
 
-  useEffect(() => {
-    syncUrl(searchTerm, selectedCategories, selectedAuthors);
-  }, [searchTerm, selectedAuthors, selectedCategories]);
+  const baseTotalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const totalPages = hasMore ? Math.max(baseTotalPages, currentPage + 1) : baseTotalPages;
+  const hasPreviousPage = currentPage > 1;
+  const hasNextPage = currentPage < totalPages;
+
+  const goToPage = useCallback(
+    (page: number) => {
+      const target = Math.min(totalPages, normalizePage(page));
+      setCurrentPage(target);
+    },
+    [totalPages]
+  );
+
+  const nextPage = useCallback(() => {
+    setCurrentPage((previous) => (previous < totalPages ? previous + 1 : previous));
+  }, [totalPages]);
+
+  const prevPage = useCallback(() => {
+    setCurrentPage((previous) => (previous > 1 ? previous - 1 : 1));
+  }, []);
 
   useEffect(() => {
-    requestId.current += 1;
-    setLoadingMore(false);
-    const timer = setTimeout(() => void fetchBooks(), debounceMs);
-    return () => clearTimeout(timer);
-  }, [fetchBooks, debounceMs]);
+    syncUrl(debouncedSearchTerm, selectedCategories, selectedAuthors, currentPage);
+  }, [debouncedSearchTerm, selectedAuthors, selectedCategories, currentPage]);
+
+  useEffect(() => {
+    void fetchBooks();
+  }, [fetchBooks]);
 
   useEffect(() => {
     void checkApiHealth().then(setHealth);
@@ -198,6 +215,8 @@ export function useBooksCatalog({
   const availableAuthors = knownAuthors.filter((author) =>
     author.label.toLocaleLowerCase('es').includes(normalizedAuthorSearch)
   );
+  const rangeStart = books.length > 0 ? (currentPage - 1) * PAGE_SIZE + 1 : 0;
+  const rangeEnd = books.length > 0 ? (currentPage - 1) * PAGE_SIZE + books.length : 0;
 
   return {
     state: {
@@ -213,11 +232,15 @@ export function useBooksCatalog({
       availableCategories: GENRES_LIST,
       availableAuthors,
       loading,
-      loadingMore,
       health,
       errorMessage,
       totalCount,
-      hasMore,
+      currentPage,
+      totalPages,
+      hasPreviousPage,
+      hasNextPage,
+      rangeStart,
+      rangeEnd,
       selectedFilterCount,
       pageSize: PAGE_SIZE,
     },
@@ -235,7 +258,9 @@ export function useBooksCatalog({
       cancelFilterDraft,
       applyFilterDraft,
       refreshBooks: fetchBooks,
-      loadMoreBooks,
+      goToPage,
+      nextPage,
+      prevPage,
       clearError: () => setErrorMessage(null),
     },
   };
