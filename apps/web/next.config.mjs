@@ -2,6 +2,9 @@
 const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ['@babilon/shared-types'],
+  experimental: {
+    serverComponentsExternalPackages: ['mongodb'],
+  },
   // Keep the dev server's output separate from `next build` so the two modes
   // cannot overwrite each other's runtime chunks.
   distDir:

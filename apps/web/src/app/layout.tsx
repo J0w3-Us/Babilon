@@ -1,3 +1,15 @@
+/**
+ * ============================================================================
+ * DISEÑO DE INTERFACES & ARQUITECTURA BASE
+ * HITO 1.1: Diseño del layout adaptable (Responsive Design)
+ * HITO 1.3: Barra de navegación interactiva y navegación SPA sin recargas
+ * ============================================================================
+ * Estructuración del esqueleto global con Next.js App Router:
+ * - Flexbox / CSS Grid con contenedor responsive elástico.
+ * - Paleta cromática cálida (tonos Crema y Grafito) anti-fatiga visual.
+ * - Proveedor de autenticación (AuthContext) para el control de roles (Admin / Lector).
+ */
+
 import type { Metadata } from 'next';
 import './globals.css';
 import Link from 'next/link';
@@ -24,11 +36,13 @@ export default function RootLayout({
           }}
         />
       </head>
+      {/* HITO 1.1: Layout elástico con unidades relativas y transición suave de temas */}
       <body className="bg-cream-100 text-stone-900 dark:bg-surface-50 dark:text-stone-100 antialiased min-h-screen flex flex-col transition-colors duration-200">
         <AuthProvider>
+          {/* HITO 1.3: Navegación principal en cabecera con soporte SPA */}
           <NavbarClient />
 
-          {/* Main Content */}
+          {/* Main Content: Vista principal dinámica */}
           <main className="flex-1">{children}</main>
 
           {/* Footer */}

@@ -1,3 +1,15 @@
+/**
+ * ============================================================================
+ * BACKEND BFF & CONTROL DE SEGURIDAD
+ * HITO 2.2: Consultas NoSQL con sanitización regex contra inyección de operadores
+ * HITO 3.1: Ruta protegida de administración con validación JWT y códigos 401/403
+ * HITO 4.2: Manejo de excepciones de red con fallback de alta disponibilidad
+ * ============================================================================
+ * - Capa intermedia (Proxy/BFF) que conecta Next.js con MongoDB Atlas y la API de Render.
+ * - Validación obligatoria de rol 'admin' para operaciones mutables (POST, PUT, DELETE).
+ * - Doble vía resiliente: si la conexión directa a Atlas falla, conmuta al backend de respaldo.
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
 import { ObjectId, Filter, Document } from 'mongodb';
 import { verifyUploadJwt } from '@/lib/jwtSecurity';

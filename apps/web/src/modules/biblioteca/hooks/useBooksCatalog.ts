@@ -1,3 +1,15 @@
+/**
+ * ============================================================================
+ * BUSCADOR AVANZADO & PAGINACIÓN DE RED
+ * HITO 2.1: Desarrollo de inputs y filtros dinámicos combinados
+ * HITO 2.2: Consultas por palabras clave con debounce y sanitización
+ * HITO 2.3: Configuración del sistema de paginación de red (limit, skip y cursor)
+ * ============================================================================
+ * - Control de búsqueda reactiva con debounce (280ms) para evitar saturación de sockets.
+ * - Combinación de criterios en condición AND (búsqueda textual + categorías + autores).
+ * - Entrega por bloques controlados (PAGE_SIZE = 20) con cursor estable para evitar desbordamiento.
+ */
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Book } from '@babilon/shared-types';
 import {

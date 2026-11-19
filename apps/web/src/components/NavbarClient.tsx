@@ -1,3 +1,15 @@
+/**
+ * ============================================================================
+ * DISEÑO DE INTERFACES & CONTROL DE NAVEGACIÓN
+ * HITO 1.3: Integración de la navegación interactiva y SPA sin recargas
+ * HITO 3.1: Control de visualización y rutas protegidas según rol (Admin vs Lector)
+ * ============================================================================
+ * - Barra de navegación con indicador de estado activo.
+ * - Despliegue condicional de rutas administrativas (/subir, /explorar-libres)
+ *   únicamente cuando el usuario autenticado posee el rol 'admin'.
+ * - Zonas táctiles superiores a 44px para ergonomía móvil y escritorio.
+ */
+
 'use client';
 
 import React from 'react';
@@ -22,6 +34,7 @@ export default function NavbarClient() {
 
   return (
     <>
+      {/* HITO 1.3: Barra de navegación fija con backdrop blur sin recarga de página */}
       <header className="sticky top-0 z-40 border-b border-stone-200/80 dark:border-surface-300 glass-header">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-3 group">
@@ -41,6 +54,7 @@ export default function NavbarClient() {
             </div>
           </Link>
 
+          {/* HITO 1.3: Enlaces de navegación cliente (SPA Next.js Router) */}
           <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-stone-600 dark:text-stone-300">
             <Link
               href="/"
@@ -58,6 +72,7 @@ export default function NavbarClient() {
               />
               Catálogo
             </Link>
+            {/* HITO 3.1: Enlaces de gestión exclusivos para administradores */}
             {isAdmin && (
               <>
                 <Link

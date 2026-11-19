@@ -1,3 +1,14 @@
+/**
+ * ============================================================================
+ * DISEÑO DE INTERFACES & COMPONENTES REUTILIZABLES
+ * HITO 1.2: Implementación de tarjetas de libros (BookCard)
+ * ============================================================================
+ * - Componente reutilizable para desplegar dinámicamente obras desde MongoDB Atlas.
+ * - Despliegue de metadatos: portada, título, autor, año/fecha, género/tipo de libro.
+ * - Manejo resiliente de carga de imágenes (Lazy loading, degradados y fallback tipográfico).
+ * - Indicador visual interactivo de progreso de lectura (useReadingProgress).
+ */
+
 'use client';
 
 import { useState } from 'react';
@@ -26,11 +37,12 @@ export function BookCard({ book, onRead, onSelect }: BookCardProps) {
   };
 
   return (
+    /* HITO 1.2: Contenedor de tarjeta responsive con elevación suiza y bordes cálidos */
     <article
       onClick={handleCardClick}
       className="bg-cream-50 dark:bg-surface-100 rounded-2xl border border-stone-200/90 dark:border-surface-300 overflow-hidden swiss-card flex flex-col group cursor-pointer transition-all hover:shadow-lg dark:hover:border-surface-400"
     >
-      {/* Visual Header / Cover Canvas */}
+      {/* Visual Header / Cover Canvas: Soporte con imagen o fallback tipográfico clásico */}
       <div className="h-52 bg-cream-100 dark:bg-surface-200 relative overflow-hidden border-b border-stone-200/80 dark:border-surface-300">
         {hasCover ? (
           <>

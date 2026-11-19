@@ -1,3 +1,14 @@
+/**
+ * ============================================================================
+ * MÓDULO ADMINISTRATIVO & GESTIÓN EDITORIAL
+ * HITO 3.1: Creación de la ruta protegida de administración (/subir)
+ * HITO 3.4: Pipeline de digitalización inteligente y preservación patrimonial
+ * ============================================================================
+ * - Control de acceso estricto: Bloquea a usuarios sin autenticación o con rol 'usuario'.
+ * - Formulario modular de digitalización de libros con ingesta de metadatos y páginas.
+ * - Conexión autenticada mediante tokens JWT firmados en el backend.
+ */
+
 'use client';
 
 import Link from 'next/link';

@@ -1,3 +1,14 @@
+/**
+ * ============================================================================
+ * DISEÑO DE INTERFACES & GESTOR DE HOJAS
+ * HITO 1.2: Visor y manipulador de páginas de texto
+ * HITO 3.4: Control de calidad en la digitalización de folios eclesiásticos
+ * ============================================================================
+ * - Permite revisar, buscar términos, excluir páginas en blanco o dañadas
+ *   y restaurar folios antes de la persistencia final en MongoDB Atlas.
+ * - Modos de visualización: mosaico modal de cuadrícula y previsualización individual.
+ */
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';

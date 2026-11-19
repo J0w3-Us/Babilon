@@ -1,3 +1,15 @@
+/**
+ * ============================================================================
+ * DISEÑO DE INTERFACES & LECTOR EDITORIAL
+ * HITO 1.2: Visor de texto plano optimizado para lectura fluida
+ * HITO 4.4: Streaming de texto por demanda (evita sobrecarga de memoria)
+ * ============================================================================
+ * - Tipografía de alta legibilidad Newsreader (16-24px ajustable).
+ * - Interlineado editorial de 1.6 a 1.8 y ancho de línea acotado (<75ch) anti-fatiga.
+ * - Soporte de temas de lectura: Pergamino (crema cálido), Claro (nítido) y Noche (grafito).
+ * - Navegación continua o carrusel página a página con persistencia de lectura.
+ */
+
 'use client';
 
 import { useEffect, useLayoutEffect, useRef } from 'react';

@@ -1,3 +1,15 @@
+/**
+ * ============================================================================
+ * CLOUD, PATRÓN SINGLETON & CONECTIVIDAD RESILIENTE
+ * HITO 4.1: Aplicación del patrón Singleton para el Connection Pool
+ * HITO 4.2: Manejo de excepciones de red y control de ServerSelectionTimeout
+ * ============================================================================
+ * - Inicialización única del cliente MongoClient mediante variable global.
+ * - Reutilización estricta del pool de sockets TCP/TLS (evita saturar MongoDB Atlas).
+ * - Control de timeout (10,000 ms) para recuperación automática ante pausas del cluster M0.
+ * - Colecciones gestionadas: 'libros', 'usuarios' y soporte de autenticación segura.
+ */
+
 import dns from 'dns';
 import { MongoClient, Db, Collection } from 'mongodb';
 import { hashPassword, UserRole } from './jwtSecurity';
