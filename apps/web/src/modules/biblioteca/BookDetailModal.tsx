@@ -22,6 +22,7 @@ import {
 import { useReadingProgress } from './hooks/useReadingProgress';
 import { useAuth } from '@/context/AuthContext';
 import { deleteBookApi, updateBookApi } from '@/services/api';
+import { formatBookSynopsis } from '@/lib/synopsisFormatter';
 
 interface BookDetailModalProps {
   book: Book;
@@ -47,12 +48,20 @@ export function BookDetailModal({
   const [saving, setSaving] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
+  const formattedSynopsis = formatBookSynopsis(book.synopsis, {
+    fallback: 'Sin sinopsis registrada para esta obra en el archivo.',
+  });
+  const synopsisParagraphs = formattedSynopsis
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean);
+
   const [editTitle, setEditTitle] = useState(book.title);
   const [editAuthor, setEditAuthor] = useState(book.author?.name || '');
   const [editYear, setEditYear] = useState(String(book.publishedYear || ''));
   const [editPublisher, setEditPublisher] = useState(book.publisher || '');
   const [editIsbn, setEditIsbn] = useState(book.isbn || '');
-  const [editSynopsis, setEditSynopsis] = useState(book.synopsis || '');
+  const [editSynopsis, setEditSynopsis] = useState(formattedSynopsis);
 
   const primaryGenre = book.genres?.[0] || 'Clásicos';
   const hasCover = Boolean(book.coverUrl && !imageError);
@@ -506,17 +515,20 @@ export function BookDetailModal({
                   </div>
                 </div>
 
-                {/* Sinopsis & Argumento Ampliada sin barra de scroll interna */}
+                {/* Sinopsis & Argumento con formato editorial unificado */}
                 <div>
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400 mb-2.5">
                     Sinopsis & Argumento
                   </h3>
-                  <div className="p-5 rounded-2xl bg-cream-100/60 dark:bg-surface-200/60 border border-stone-200/80 dark:border-surface-300">
-                    <p className="text-sm text-stone-700 dark:text-stone-300 leading-relaxed font-serif whitespace-pre-line">
-                      {book.synopsis && book.synopsis.trim()
-                        ? book.synopsis
-                        : 'Sin sinopsis registrada para esta obra en el archivo.'}
-                    </p>
+                  <div className="p-5 rounded-2xl bg-cream-100/60 dark:bg-surface-200/60 border border-stone-200/80 dark:border-surface-300 space-y-3">
+                    {synopsisParagraphs.map((paragraph, index) => (
+                      <p
+                        key={index}
+                        className="text-sm text-stone-700 dark:text-stone-300 leading-relaxed font-serif text-pretty"
+                      >
+                        {paragraph}
+                      </p>
+                    ))}
                   </div>
                 </div>
               </>

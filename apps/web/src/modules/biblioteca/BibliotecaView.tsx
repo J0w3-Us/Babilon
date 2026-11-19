@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -13,6 +13,9 @@ import {
   CheckCircle2,
   ArrowLeft,
   Sparkles,
+  ChevronLeft,
+  ChevronRight,
+  AlertCircle,
 } from 'lucide-react';
 
 import { BookCard } from './BookCard';
@@ -24,11 +27,40 @@ import { useBooksCatalog } from './hooks/useBooksCatalog';
 import { useBookReader } from './hooks/useBookReader';
 import { useAuth } from '@/context/AuthContext';
 
+function buildPaginationItems(
+  currentPage: number,
+  totalPages: number
+): Array<number | 'ellipsis'> {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1);
+  }
+
+  const pages = new Set<number>([1, totalPages]);
+  for (let p = currentPage - 1; p <= currentPage + 1; p += 1) {
+    if (p > 1 && p < totalPages) {
+      pages.add(p);
+    }
+  }
+
+  const sorted = Array.from(pages).sort((a, b) => a - b);
+  const items: Array<number | 'ellipsis'> = [];
+  for (let i = 0; i < sorted.length; i += 1) {
+    if (i > 0 && sorted[i] - sorted[i - 1] > 1) {
+      items.push('ellipsis');
+    }
+    items.push(sorted[i]);
+  }
+  return items;
+}
+
 export function BibliotecaView() {
   const { isAdmin } = useAuth();
   const searchParams = useSearchParams();
+  const catalogSectionRef = useRef<HTMLElement | null>(null);
   const [selectedDetailBook, setSelectedDetailBook] = useState<Book | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const initialPageParam = Number(searchParams.get('page') ?? '1');
 
   const {
     state: catalog,
@@ -42,12 +74,15 @@ export function BibliotecaView() {
       cancelFilterDraft,
       applyFilterDraft,
       refreshBooks,
-      loadMoreBooks,
+      goToPage,
+      nextPage,
+      prevPage,
     },
   } = useBooksCatalog({
     initialQuery: searchParams.get('q') ?? '',
     initialCategories: searchParams.getAll('category'),
     initialAuthors: searchParams.getAll('author'),
+    initialPage: Number.isFinite(initialPageParam) && initialPageParam >= 1 ? initialPageParam : 1,
   });
 
   const {
@@ -68,6 +103,31 @@ export function BibliotecaView() {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 4000);
   };
+
+  const scrollToCatalogTop = () => {
+    catalogSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const handleGoToPage = (page: number) => {
+    if (page === catalog.currentPage || catalog.loading) return;
+    goToPage(page);
+    scrollToCatalogTop();
+  };
+
+  const handlePrevPage = () => {
+    if (!catalog.hasPreviousPage || catalog.loading) return;
+    prevPage();
+    scrollToCatalogTop();
+  };
+
+  const handleNextPage = () => {
+    if (!catalog.hasNextPage || catalog.loading) return;
+    nextPage();
+    scrollToCatalogTop();
+  };
+
+  const paginationItems = buildPaginationItems(catalog.currentPage, catalog.totalPages);
+  const totalDisplayedCount = catalog.totalCount || catalog.books.length;
 
   return (
     <div className="min-h-screen bg-cream-100 dark:bg-surface-50 text-stone-900 dark:text-stone-100 selection:bg-terracotta-100 selection:text-terracotta-900 font-sans pb-16 transition-colors duration-200">
@@ -100,7 +160,7 @@ export function BibliotecaView() {
             {catalog.health && (
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 text-xs font-medium border border-emerald-200 dark:border-emerald-800">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                Catálogo: {catalog.totalCount > 0 ? `${catalog.books.length} de ${catalog.totalCount} obras` : `${catalog.books.length} obras`}
+                Catálogo: {totalDisplayedCount} {totalDisplayedCount === 1 ? 'obra' : 'obras'}
               </span>
             )}
 
@@ -160,7 +220,8 @@ export function BibliotecaView() {
 
             <div className="md:col-span-4 flex items-center justify-end gap-3 text-xs text-stone-600 dark:text-stone-400">
               <span className="font-mono">
-                {catalog.books.length} {catalog.books.length === 1 ? 'obra' : 'obras'}
+                {totalDisplayedCount} {totalDisplayedCount === 1 ? 'obra' : 'obras'}
+                {catalog.totalPages > 1 ? ` · Pág. ${catalog.currentPage}/${catalog.totalPages}` : ''}
               </span>
               <button
                 onClick={() => refreshBooks()}
@@ -202,7 +263,26 @@ export function BibliotecaView() {
       </section>
 
       {/* Book Grid */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-16">
+      <section
+        ref={catalogSectionRef}
+        className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-16 scroll-mt-4"
+      >
+        {catalog.errorMessage && (
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50/80 dark:bg-red-950/30 px-4 py-3 text-xs text-red-700 dark:text-red-300">
+            <div className="flex items-center gap-2">
+              <AlertCircle size={15} className="shrink-0" />
+              <span>{catalog.errorMessage}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => refreshBooks()}
+              className="px-3 py-1 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700 transition-colors cursor-pointer"
+            >
+              Reintentar
+            </button>
+          </div>
+        )}
+
         {catalog.loading && catalog.books.length === 0 ? (
           <div className="py-24 text-center">
             <RefreshCw
@@ -234,42 +314,84 @@ export function BibliotecaView() {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div
+              className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 transition-opacity duration-200 ${
+                catalog.loading ? 'opacity-55 pointer-events-none' : 'opacity-100'
+              }`}
+              aria-busy={catalog.loading}
+            >
               {catalog.books.map((book) => (
-                <BookCard key={book.id} book={book} onRead={openBook} onSelect={setSelectedDetailBook} />
+                <BookCard
+                  key={book.id}
+                  book={book}
+                  onRead={openBook}
+                  onSelect={setSelectedDetailBook}
+                />
               ))}
             </div>
 
-            {/* Paginación y Carga por Lotes de 20 */}
-            <div className="mt-12 flex flex-col items-center justify-center gap-3">
-              {catalog.hasMore ? (
+            {/* Paginación por páginas de 20 obras */}
+            <nav
+              aria-label="Paginación del catálogo"
+              className="mt-12 pt-6 border-t border-stone-200/80 dark:border-surface-300 flex flex-col sm:flex-row items-center justify-between gap-4"
+            >
+              <p className="text-xs font-mono text-stone-500 dark:text-stone-400 order-2 sm:order-1">
+                Mostrando {catalog.rangeStart}–{catalog.rangeEnd} de {totalDisplayedCount}{' '}
+                {totalDisplayedCount === 1 ? 'obra' : 'obras'} · Página {catalog.currentPage} de{' '}
+                {catalog.totalPages}
+              </p>
+
+              <div className="flex items-center gap-1.5 order-1 sm:order-2 flex-wrap justify-center">
                 <button
                   type="button"
-                  disabled={catalog.loadingMore}
-                  onClick={() => loadMoreBooks()}
-                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-stone-900 text-stone-50 dark:bg-stone-100 dark:text-stone-900 font-semibold text-xs hover:bg-stone-800 dark:hover:bg-white shadow-md hover:shadow-lg transition-all cursor-pointer disabled:opacity-50"
+                  disabled={!catalog.hasPreviousPage || catalog.loading}
+                  onClick={handlePrevPage}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-stone-200 dark:border-surface-300 bg-cream-50 dark:bg-surface-200 text-xs font-semibold text-stone-700 dark:text-stone-200 hover:bg-cream-200/70 dark:hover:bg-surface-300 transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
                 >
-                  {catalog.loadingMore ? (
-                    <>
-                      <RefreshCw size={14} className="animate-spin" />
-                      <span>Cargando más obras...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>Cargar más obras (+20)</span>
-                    </>
-                  )}
+                  <ChevronLeft size={15} />
+                  <span>Anterior</span>
                 </button>
-              ) : catalog.books.length > 20 ? (
-                <p className="text-xs font-mono text-stone-400 dark:text-stone-500">
-                  Has visualizado el total de las {catalog.totalCount} obras disponibles en este filtro.
-                </p>
-              ) : null}
 
-              <p className="text-[11px] font-mono text-stone-500 dark:text-stone-400">
-                Mostrando {catalog.books.length} de {catalog.totalCount || catalog.books.length} obras registradas
-              </p>
-            </div>
+                <div className="flex items-center gap-1">
+                  {paginationItems.map((item, idx) =>
+                    item === 'ellipsis' ? (
+                      <span
+                        key={`ellipsis-${idx}`}
+                        className="px-2 py-1 text-xs font-mono text-stone-400 dark:text-stone-500 select-none"
+                        aria-hidden="true"
+                      >
+                        …
+                      </span>
+                    ) : (
+                      <button
+                        key={item}
+                        type="button"
+                        disabled={catalog.loading}
+                        onClick={() => handleGoToPage(item)}
+                        aria-current={item === catalog.currentPage ? 'page' : undefined}
+                        className={`min-w-[2.25rem] h-9 px-2.5 rounded-xl text-xs font-mono font-semibold transition-all cursor-pointer disabled:pointer-events-none ${
+                          item === catalog.currentPage
+                            ? 'bg-stone-900 text-cream-50 dark:bg-cream-100 dark:text-stone-900 shadow-subtle'
+                            : 'border border-stone-200 dark:border-surface-300 bg-cream-50 dark:bg-surface-200 text-stone-700 dark:text-stone-300 hover:bg-cream-200/70 dark:hover:bg-surface-300'
+                        }`}
+                      >
+                        {item}
+                      </button>
+                    )
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  disabled={!catalog.hasNextPage || catalog.loading}
+                  onClick={handleNextPage}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-stone-200 dark:border-surface-300 bg-cream-50 dark:bg-surface-200 text-xs font-semibold text-stone-700 dark:text-stone-200 hover:bg-cream-200/70 dark:hover:bg-surface-300 transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
+                >
+                  <span>Siguiente</span>
+                  <ChevronRight size={15} />
+                </button>
+              </div>
+            </nav>
           </>
         )}
       </section>

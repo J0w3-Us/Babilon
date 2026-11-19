@@ -14,8 +14,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ObjectId, Filter, Document } from 'mongodb';
 import { verifyUploadJwt } from '@/lib/jwtSecurity';
 import { getLibrosCollection } from '@/lib/mongoDb';
+import { formatBookSynopsis } from '@/lib/synopsisFormatter';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -183,7 +185,10 @@ async function handleDirectMongo(
             : 'Autor desconocido';
       const isbn = String(body.isbn ?? body.isbn_o_codigo ?? titulo).trim();
       const editorial = String(body.editorial ?? body.publisher ?? 'Editorial Babilon').trim();
-      const sinopsis = String(body.sinopsis ?? body.synopsis ?? '').trim();
+      const sinopsis = formatBookSynopsis(
+        String(body.sinopsis ?? body.synopsis ?? '').trim(),
+        { fallback: '' }
+      );
       const anio = Number(body.anio_publicacion ?? body.publishedYear ?? new Date().getFullYear());
       const categorias = Array.isArray(body.categorias)
         ? body.categorias
@@ -296,7 +301,10 @@ async function handleDirectMongo(
           updates.editorial = String(body.publisher ?? body.editorial).trim();
         }
         if (typeof body.synopsis === 'string' || typeof body.sinopsis === 'string') {
-          updates.sinopsis = String(body.synopsis ?? body.sinopsis).trim();
+          updates.sinopsis = formatBookSynopsis(
+            String(body.synopsis ?? body.sinopsis).trim(),
+            { fallback: '' }
+          );
           updates.resumen = updates.sinopsis;
           updates.descripcion = updates.sinopsis;
         }
@@ -358,7 +366,14 @@ async function proxyToRemoteBackend(
   request: NextRequest,
   path: string
 ): Promise<NextResponse> {
-  const targetUrl = `${BACKEND_URL}/${path}${request.nextUrl.search}`;
+  const searchParams = new URLSearchParams(request.nextUrl.searchParams);
+  if (path === 'api/libros' && searchParams.has('cursor') && !searchParams.has('skip')) {
+    const cursorAsSkip = Math.max(0, Number(searchParams.get('cursor')) || 0);
+    searchParams.set('skip', String(cursorAsSkip));
+    searchParams.delete('cursor');
+  }
+  const queryString = searchParams.toString();
+  const targetUrl = `${BACKEND_URL}/${path}${queryString ? `?${queryString}` : ''}`;
   const headers = new Headers();
   headers.set('Accept', 'application/json');
 
