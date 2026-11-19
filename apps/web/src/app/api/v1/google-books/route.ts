@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getLibrosCollection } from '@/lib/mongoDb';
 import { verifyUploadJwt } from '@/lib/jwtSecurity';
 import { formatPageTextStructure } from '@/lib/bookTextCleaner';
+import { formatBookSynopsis, hasCorruptedEncoding } from '@/lib/synopsisFormatter';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -546,18 +547,6 @@ let dbBooksCache: {
   titles: Set<string>;
 } | null = null;
 
-function cleanHtmlTags(input: string): string {
-  return input
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
 function buildGoogleCoverUrl(volumeId: string, imageLinks?: Record<string, string>): string {
   const candidate =
     imageLinks?.extraLarge ||
@@ -688,10 +677,21 @@ async function enrichWithGoogleBooksApi(
             ? buildGoogleCoverUrl(volId, info.imageLinks)
             : fallbackCover;
 
-          const googleDesc =
-            typeof info.description === 'string' && info.description.trim().length > 60
-              ? cleanHtmlTags(info.description)
-              : book.synopsis;
+          const rawGoogleDesc =
+            typeof info.description === 'string' ? info.description.trim() : '';
+          const fallbackHasRealSynopsis =
+            book.synopsis.trim().length > 60 &&
+            !book.synopsis.startsWith('Obra completa de dominio público');
+          const googleDescLooksBroken =
+            !rawGoogleDesc ||
+            rawGoogleDesc.length <= 60 ||
+            /^Example in this ebook\b/i.test(rawGoogleDesc) ||
+            (hasCorruptedEncoding(rawGoogleDesc) && fallbackHasRealSynopsis);
+
+          const googleDesc = formatBookSynopsis(
+            googleDescLooksBroken ? book.synopsis : rawGoogleDesc,
+            { fallback: formatBookSynopsis(book.synopsis) }
+          );
 
           const meta = {
             googleBookId: volId,
@@ -1324,9 +1324,10 @@ async function fetchGutendexPage(
         category: normalizeGutendexCategory(category),
         genre: mapCategoryToSpanishGenre(category),
         pageCount: 180,
-        synopsis:
+        synopsis: formatBookSynopsis(
           item.summaries?.[0] ||
-          'Obra completa de dominio público en español disponible para importación íntegra.',
+            'Obra completa de dominio público en español disponible para importación íntegra.'
+        ),
         fullTextUrl: txtUrl,
         coverUrl: rawCover,
       });
@@ -1562,12 +1563,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2. Paginar el texto completo en el número exacto de páginas correspondientes al libro
+    // 2. Normalizar la sinopsis con el formato editorial único y paginar el texto completo
+    const normalizedSynopsis = formatBookSynopsis(book.synopsis);
     const paginas = paginateFullBookToTargetPages(
       fullText,
       targetPageCount,
       book.title,
-      book.synopsis,
+      normalizedSynopsis,
       book.author
     );
 
@@ -1583,8 +1585,8 @@ export async function POST(request: NextRequest) {
       titulo: book.title,
       autor: book.author,
       editorial: book.publisher || 'Google Books / Dominio Público',
-      sinopsis: book.synopsis,
-      resumen: book.synopsis,
+      sinopsis: normalizedSynopsis,
+      resumen: normalizedSynopsis,
       categorias: book.genres?.length ? book.genres : ['Clásicos'],
       tipo_libro: book.genres?.[0] || 'Clásicos',
       anio_publicacion: book.publishedYear || 1900,

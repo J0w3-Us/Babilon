@@ -1,4 +1,5 @@
 import { Book, BookGenre, BookPage, BookChapter } from '@babilon/shared-types';
+import { formatBookSynopsis } from '@/lib/synopsisFormatter';
 
 const DEFAULT_COVER_URL = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=600&q=80';
 
@@ -83,10 +84,13 @@ export function normalizeBook(doc: Record<string, any>): Book {
     contenido: c.contenido,
   }));
 
-  let synopsis = doc.sinopsis ?? doc.synopsis ?? doc.descripcion ?? '';
-  if (!synopsis && pages.length > 0 && pages[0].texto) {
-    synopsis = pages[0].texto.slice(0, 220) + '...';
+  let rawSynopsis = doc.sinopsis ?? doc.synopsis ?? doc.descripcion ?? doc.resumen ?? '';
+  if (!rawSynopsis && pages.length > 0 && pages[0].texto) {
+    rawSynopsis = pages[0].texto.slice(0, 400);
   }
+  const synopsis = formatBookSynopsis(rawSynopsis, {
+    fallback: 'Sin sinopsis disponible.',
+  });
 
   // Generar muestra si no existe
   let sampleChapterText: string | undefined = doc.sampleChapterText;
@@ -110,7 +114,7 @@ export function normalizeBook(doc: Record<string, any>): Book {
     isbn: doc.isbn ?? 'N/A',
     author,
     genres,
-    synopsis: synopsis || 'Sin sinopsis disponible.',
+    synopsis,
     publishedYear,
     publisher: doc.editorial ?? doc.publisher ?? 'Editorial Babilon',
     pageCount: Number(doc.total_paginas ?? doc.pageCount ?? (pages.length > 0 ? pages.length : 0)),

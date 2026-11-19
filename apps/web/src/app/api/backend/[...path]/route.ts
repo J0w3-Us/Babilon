@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ObjectId, Filter, Document } from 'mongodb';
 import { verifyUploadJwt } from '@/lib/jwtSecurity';
 import { getLibrosCollection } from '@/lib/mongoDb';
+import { formatBookSynopsis } from '@/lib/synopsisFormatter';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -184,7 +185,10 @@ async function handleDirectMongo(
             : 'Autor desconocido';
       const isbn = String(body.isbn ?? body.isbn_o_codigo ?? titulo).trim();
       const editorial = String(body.editorial ?? body.publisher ?? 'Editorial Babilon').trim();
-      const sinopsis = String(body.sinopsis ?? body.synopsis ?? '').trim();
+      const sinopsis = formatBookSynopsis(
+        String(body.sinopsis ?? body.synopsis ?? '').trim(),
+        { fallback: '' }
+      );
       const anio = Number(body.anio_publicacion ?? body.publishedYear ?? new Date().getFullYear());
       const categorias = Array.isArray(body.categorias)
         ? body.categorias
@@ -297,7 +301,10 @@ async function handleDirectMongo(
           updates.editorial = String(body.publisher ?? body.editorial).trim();
         }
         if (typeof body.synopsis === 'string' || typeof body.sinopsis === 'string') {
-          updates.sinopsis = String(body.synopsis ?? body.sinopsis).trim();
+          updates.sinopsis = formatBookSynopsis(
+            String(body.synopsis ?? body.sinopsis).trim(),
+            { fallback: '' }
+          );
           updates.resumen = updates.sinopsis;
           updates.descripcion = updates.sinopsis;
         }
