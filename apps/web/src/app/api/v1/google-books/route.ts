@@ -41,6 +41,8 @@ interface CuratedSpanishBook {
   genre: string;
   pageCount: number;
   synopsis: string;
+  fullTextUrl?: string;
+  coverUrl?: string;
 }
 
 /**
@@ -579,8 +581,12 @@ async function enrichWithGoogleBooksApi(
   book: CuratedSpanishBook,
   apiKey: string
 ): Promise<GoogleBookVolumeItem> {
-  const fallbackCover = `https://gutenberg.pglaf.org/cache/epub/${book.gutenbergId}/pg${book.gutenbergId}.cover.medium.jpg`;
-  const fullTextUrl = `https://gutenberg.pglaf.org/cache/epub/${book.gutenbergId}/pg${book.gutenbergId}.txt`;
+  const fallbackCover =
+    book.coverUrl ||
+    `https://gutenberg.pglaf.org/cache/epub/${book.gutenbergId}/pg${book.gutenbergId}.cover.medium.jpg`;
+  const fullTextUrl =
+    book.fullTextUrl ||
+    `https://gutenberg.pglaf.org/cache/epub/${book.gutenbergId}/pg${book.gutenbergId}.txt`;
   const epubDownloadLink = `https://gutenberg.pglaf.org/cache/epub/${book.gutenbergId}/pg${book.gutenbergId}-images.epub3`;
 
   // Si es una obra del catálogo base, evitamos hacer peticiones en cascada a Google Books API
@@ -1191,10 +1197,157 @@ async function downloadFullBookText(book: GoogleBookVolumeItem): Promise<string>
   return '';
 }
 
+const GUTENDEX_PAGE_SIZE = 32;
+const GUTENDEX_CACHE_TTL_MS = 10 * 60 * 1000;
+
+interface GutendexCacheEntry {
+  timestamp: number;
+  count: number;
+  items: CuratedSpanishBook[];
+}
+
+const gutendexPageCache = new Map<string, GutendexCacheEntry>();
+
+function mapCategoryToGutendexTopic(category: string): string | null {
+  switch (category) {
+    case 'literatura':
+      return 'literature';
+    case 'filosofia':
+      return 'philosophy';
+    case 'historia':
+      return 'history';
+    case 'poesia':
+      return 'poetry';
+    case 'ciencia':
+      return 'science';
+    default:
+      return null;
+  }
+}
+
+function mapCategoryToSpanishGenre(category: string): string {
+  switch (category) {
+    case 'filosofia':
+      return 'Filosofía';
+    case 'historia':
+      return 'Historia';
+    case 'poesia':
+      return 'Poesía y Teatro';
+    case 'ciencia':
+      return 'Ciencia y Ensayo';
+    default:
+      return 'Clásicos';
+  }
+}
+
+function normalizeGutendexCategory(
+  category: string
+): CuratedSpanishBook['category'] {
+  if (
+    category === 'literatura' ||
+    category === 'filosofia' ||
+    category === 'historia' ||
+    category === 'poesia' ||
+    category === 'ciencia'
+  ) {
+    return category;
+  }
+  return 'literatura';
+}
+
+async function fetchGutendexPage(
+  category: string,
+  customQuery: string,
+  page: number
+): Promise<{ count: number; items: CuratedSpanishBook[] }> {
+  const cacheKey = `${category}|${customQuery}|${page}`;
+  const cached = gutendexPageCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < GUTENDEX_CACHE_TTL_MS) {
+    return { count: cached.count, items: cached.items };
+  }
+
+  try {
+    const gutendexUrl = new URL('https://gutendex.com/books');
+    gutendexUrl.searchParams.set('languages', 'es');
+    gutendexUrl.searchParams.set('page', String(page));
+
+    const topic = mapCategoryToGutendexTopic(category);
+    if (topic) {
+      gutendexUrl.searchParams.set('topic', topic);
+    }
+    if (customQuery) {
+      gutendexUrl.searchParams.set('search', customQuery);
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(gutendexUrl.toString(), {
+      signal: controller.signal,
+      cache: 'no-store',
+    });
+    clearTimeout(timeout);
+
+    if (!res.ok) {
+      return { count: 0, items: [] };
+    }
+
+    const data = await res.json();
+    const count = Number(data?.count || 0);
+    const rawResults = Array.isArray(data?.results) ? data.results : [];
+    const mapped: CuratedSpanishBook[] = [];
+
+    for (const item of rawResults) {
+      const formats = (item?.formats || {}) as Record<string, string | undefined>;
+      const txtUrl =
+        formats['text/plain; charset=utf-8'] ||
+        formats['text/plain; charset=us-ascii'] ||
+        formats['text/plain'] ||
+        '';
+      if (item?.media_type !== 'Text' || !txtUrl || txtUrl.includes('readme')) {
+        continue;
+      }
+
+      const rawCover = formats['image/jpeg'];
+      const gutenbergId = Number(item.id);
+      if (!Number.isFinite(gutenbergId) || gutenbergId <= 0) continue;
+
+      mapped.push({
+        gutenbergId,
+        isDynamic: true,
+        title: String(item.title || 'Obra clásica').split('$b')[0].trim(),
+        author: item.authors?.[0]?.name
+          ? String(item.authors[0].name).split(',').reverse().join(' ').trim()
+          : 'Autor clásico',
+        publishedYear: item.authors?.[0]?.birth_year
+          ? Number(item.authors[0].birth_year) + 35
+          : 1880,
+        category: normalizeGutendexCategory(category),
+        genre: mapCategoryToSpanishGenre(category),
+        pageCount: 180,
+        synopsis:
+          item.summaries?.[0] ||
+          'Obra completa de dominio público en español disponible para importación íntegra.',
+        fullTextUrl: txtUrl,
+        coverUrl: rawCover,
+      });
+    }
+
+    gutendexPageCache.set(cacheKey, {
+      timestamp: Date.now(),
+      count,
+      items: mapped,
+    });
+
+    return { count, items: mapped };
+  } catch {
+    return { count: 0, items: [] };
+  }
+}
+
 /**
  * GET /api/v1/google-books
- * Devuelve el catálogo de obras libres en español con texto completo garantizado
- * y portadas/metadatos alimentados por Google Books API.
+ * Devuelve el catálogo curado y ampliado con Gutendex (dominio público en español),
+ * con portadas/metadatos alimentados por Google Books API y paginación continua.
  */
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -1205,8 +1358,8 @@ export async function GET(request: NextRequest) {
 
   const apiKey = process.env.GOOGLE_BOOKS_API_KEY?.trim() || '';
 
-  // 1. Filtrar obras por categoría y búsqueda
-  let filteredCatalog = SPANISH_FREE_BOOKS_CATALOG.filter((b) => {
+  // 1. Filtrar catálogo curado base por categoría y búsqueda
+  const filteredCatalog = SPANISH_FREE_BOOKS_CATALOG.filter((b) => {
     if (category !== 'todos' && b.category !== category) {
       return false;
     }
@@ -1217,57 +1370,68 @@ export async function GET(request: NextRequest) {
     return true;
   });
 
-  // Si el usuario buscó un término específico y hay pocos resultados locales, consultar Gutendex en vivo
-  const dynamicBooks: CuratedSpanishBook[] = [];
-  if (customQuery && filteredCatalog.length < 6) {
-    try {
-      const gutendexUrl = `https://gutendex.com/books?languages=es&search=${encodeURIComponent(
-        customQuery
-      )}`;
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 5000);
-      const res = await fetch(gutendexUrl, { signal: controller.signal });
-      clearTimeout(timeout);
+  const curatedIds = new Set(SPANISH_FREE_BOOKS_CATALOG.map((b) => b.gutenbergId));
+  const curatedCount = filteredCatalog.length;
 
-      if (res.ok) {
-        const data = await res.json();
-        const rawResults = Array.isArray(data?.results) ? data.results : [];
-        for (const item of rawResults) {
-          const txtUrl = item?.formats?.['text/plain; charset=utf-8'];
-          if (
-            item?.media_type === 'Text' &&
-            txtUrl &&
-            !txtUrl.includes('readme') &&
-            !filteredCatalog.some((c) => c.gutenbergId === item.id)
-          ) {
-            dynamicBooks.push({
-              gutenbergId: Number(item.id),
-              isDynamic: true,
-              title: String(item.title || 'Obra clásica').split('$b')[0].trim(),
-              author: item.authors?.[0]?.name
-                ? String(item.authors[0].name).split(',').reverse().join(' ').trim()
-                : 'Autor clásico',
-              publishedYear: item.authors?.[0]?.birth_year
-                ? Number(item.authors[0].birth_year) + 35
-                : 1880,
-              category: 'literatura',
-              genre: 'Clásicos',
-              pageCount: 180,
-              synopsis:
-                item.summaries?.[0] ||
-                `Obra completa de dominio público en español disponible para importación íntegra.`,
-            });
-          }
-        }
-      }
-    } catch {
-      // Mantener resultados del catálogo base
+  // 2. Calcular qué páginas de Gutendex se necesitan para completar la ventana [startIndex, startIndex + maxResults)
+  //    y consultar página 1 cuando aún estamos en el bloque curado para reportar el total ampliado.
+  const endIndex = startIndex + maxResults;
+  const gutendexPagesToFetch = new Set<number>();
+
+  if (endIndex > curatedCount) {
+    const firstDynamicOffset = Math.max(0, startIndex - curatedCount);
+    const lastDynamicOffset = endIndex - curatedCount - 1;
+    const firstPage = Math.floor(firstDynamicOffset / GUTENDEX_PAGE_SIZE) + 1;
+    const lastPage = Math.floor(lastDynamicOffset / GUTENDEX_PAGE_SIZE) + 1;
+    for (let p = firstPage; p <= lastPage; p++) {
+      gutendexPagesToFetch.add(p);
     }
+  } else {
+    gutendexPagesToFetch.add(1);
   }
 
-  const combinedCatalog = [...filteredCatalog, ...dynamicBooks];
-  const totalItems = combinedCatalog.length;
-  const pageSlice = combinedCatalog.slice(startIndex, startIndex + maxResults);
+  const gutendexResponses = await Promise.all(
+    Array.from(gutendexPagesToFetch)
+      .sort((a, b) => a - b)
+      .map(async (page) => ({
+        page,
+        ...(await fetchGutendexPage(category, customQuery, page)),
+      }))
+  );
+
+  const gutendexTotal = gutendexResponses.reduce(
+    (max, r) => Math.max(max, r.count),
+    0
+  );
+
+  // Construir la porción solicitada combinando catálogo curado + Gutendex sin duplicados
+  const pageSlice: CuratedSpanishBook[] = [];
+  if (startIndex < curatedCount) {
+    pageSlice.push(...filteredCatalog.slice(startIndex, Math.min(endIndex, curatedCount)));
+  }
+
+  if (pageSlice.length < maxResults && endIndex > curatedCount) {
+    const needed = maxResults - pageSlice.length;
+    const dynamicOffset = Math.max(0, startIndex - curatedCount);
+    const firstFetchedPage = Math.min(...Array.from(gutendexPagesToFetch));
+    const baseOffsetInFetched = (firstFetchedPage - 1) * GUTENDEX_PAGE_SIZE;
+    const localStart = Math.max(0, dynamicOffset - baseOffsetInFetched);
+
+    const dynamicPool: CuratedSpanishBook[] = [];
+    const seenDynamic = new Set<number>();
+    for (const resp of gutendexResponses) {
+      for (const item of resp.items) {
+        if (!curatedIds.has(item.gutenbergId) && !seenDynamic.has(item.gutenbergId)) {
+          seenDynamic.add(item.gutenbergId);
+          dynamicPool.push(item);
+        }
+      }
+    }
+
+    pageSlice.push(...dynamicPool.slice(localStart, localStart + needed));
+  }
+
+  const totalItems = curatedCount + gutendexTotal;
 
   // 2. Consultar qué libros ya existen en MongoDB Atlas (con caché en memoria de 20s para cambios rápidos de pestaña)
   let existingCodes = new Set<string>();
