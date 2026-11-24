@@ -91,6 +91,12 @@ export interface Book {
   pages?: BookPage[];
   stock?: number;
   featured?: boolean;
+  uploadedAt?: string;
+  updatedAt?: string | null;
+  wasUpdated?: boolean;
+  origin?: string;
+  uploadedBy?: string;
+  updatedBy?: string;
 }
 
 export interface UserShelfItem {

@@ -203,6 +203,28 @@ async function handleDirectMongo(
           ? body.coverUrl.trim()
           : undefined;
       const ahora = new Date().toISOString();
+      const incomingToken =
+        request.headers.get('x-babilon-jwt') ||
+        request.headers.get('authorization');
+      const authInfo = verifyUploadJwt(incomingToken);
+      const actorName =
+        authInfo.payload?.nombre ||
+        authInfo.payload?.username ||
+        'Administrador';
+
+      const filter: Filter<Document> = isbn
+        ? { $or: [{ isbn_o_codigo: isbn }, { isbn }] }
+        : { titulo };
+
+      const existingDoc = await colLibros.findOne(filter, {
+        projection: { _id: 1, fecha_subida: 1, fecha_procesamiento: 1, subido_por: 1 },
+      });
+
+      const isUpdate = Boolean(existingDoc);
+      const fechaSubidaOriginal =
+        (typeof existingDoc?.fecha_subida === 'string' && existingDoc.fecha_subida) ||
+        (typeof existingDoc?.fecha_procesamiento === 'string' && existingDoc.fecha_procesamiento) ||
+        ahora;
 
       const docToSave: Record<string, unknown> = {
         isbn_o_codigo: isbn,
@@ -224,13 +246,21 @@ async function handleDirectMongo(
         paginas,
         ...(portadaUrl ? { portada_url: portadaUrl, coverUrl: portadaUrl } : {}),
         ...(typeof body.google_book_id === 'string' ? { google_book_id: body.google_book_id } : {}),
+        origen_datos:
+          typeof body.origen_datos === 'string'
+            ? body.origen_datos
+            : typeof body.google_book_id === 'string'
+              ? 'google_books_api'
+              : 'digitalizacion_local',
+        fecha_subida: fechaSubidaOriginal,
+        fecha_procesamiento: fechaSubidaOriginal,
         fecha_actualizacion: ahora,
-        fecha_procesamiento: ahora,
+        fecha_ultima_modificacion: isUpdate ? ahora : null,
+        fue_actualizado: isUpdate,
+        subido_por:
+          (typeof existingDoc?.subido_por === 'string' && existingDoc.subido_por) || actorName,
+        ...(isUpdate ? { actualizado_por: actorName } : {}),
       };
-
-      const filter: Filter<Document> = isbn
-        ? { $or: [{ isbn_o_codigo: isbn }, { isbn }] }
-        : { titulo };
 
       const result = await colLibros.updateOne(
         filter,
@@ -281,8 +311,21 @@ async function handleDirectMongo(
 
       if (request.method === 'PUT') {
         const body = (await request.json()) as Record<string, unknown>;
+        const ahora = new Date().toISOString();
+        const incomingToken =
+          request.headers.get('x-babilon-jwt') ||
+          request.headers.get('authorization');
+        const authInfo = verifyUploadJwt(incomingToken);
+        const actorName =
+          authInfo.payload?.nombre ||
+          authInfo.payload?.username ||
+          'Administrador';
+
         const updates: Record<string, unknown> = {
-          fecha_actualizacion: new Date().toISOString(),
+          fecha_actualizacion: ahora,
+          fecha_ultima_modificacion: ahora,
+          fue_actualizado: true,
+          actualizado_por: actorName,
         };
 
         if (typeof body.title === 'string' || typeof body.titulo === 'string') {

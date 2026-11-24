@@ -272,43 +272,6 @@ export function GoogleBooksExplorerView() {
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-cream-50 dark:bg-surface-100 text-stone-900 dark:text-stone-100 py-8 sm:py-10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
-        {/* Navegación Superior */}
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-3 text-xs text-stone-500 dark:text-stone-400">
-            <Link
-              href="/biblioteca"
-              className="inline-flex items-center gap-1.5 hover:text-stone-900 dark:hover:text-stone-100 transition-colors font-medium"
-            >
-              <ArrowLeft size={14} />
-              Volver al Catálogo
-            </Link>
-            <span className="text-stone-300 dark:text-surface-300">/</span>
-            <span className="text-terracotta-700 dark:text-terracotta-400 font-semibold uppercase tracking-wider text-[11px]">
-              Google Books API • Obras de Uso Libre
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2.5">
-            <Link
-              href="/subir"
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-stone-200 dark:border-surface-300 bg-white dark:bg-surface-200 text-xs font-semibold text-stone-700 dark:text-stone-200 hover:bg-stone-100 dark:hover:bg-surface-300 transition-colors"
-            >
-              <UploadCloud size={14} />
-              <span>Subir PDF Local</span>
-            </Link>
-
-            <button
-              type="button"
-              onClick={() => fetchGoogleBooks()}
-              disabled={loading}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-stone-900 text-cream-50 dark:bg-cream-100 dark:text-stone-900 text-xs font-semibold hover:opacity-90 transition-all cursor-pointer disabled:opacity-50"
-            >
-              <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
-              <span>Sincronizar API</span>
-            </button>
-          </div>
-        </div>
-
         {/* Cabecera Editorial */}
         <div className="rounded-3xl border border-stone-200/90 dark:border-surface-300 bg-white dark:bg-surface-200/60 p-6 sm:p-8 shadow-subtle space-y-6">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
@@ -325,25 +288,37 @@ export function GoogleBooksExplorerView() {
               </p>
             </div>
 
-            {/* Indicador de Estado de API Key */}
-            <div
-              className={`px-4 py-3 rounded-2xl border flex items-center gap-3 shrink-0 ${
-                apiKeyConfigured
-                  ? 'border-emerald-200/80 bg-emerald-50/60 dark:border-emerald-900/50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300'
-                  : 'border-amber-300/80 bg-amber-50/70 dark:border-amber-800/60 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300'
-              }`}
-            >
-              <KeyRound size={18} className="shrink-0" />
-              <div className="text-xs">
-                <p className="font-bold">
-                  {apiKeyConfigured ? 'GOOGLE_BOOKS_API_KEY Activa' : 'API Key Pendiente en .env.local'}
-                </p>
-                <p className="text-[11px] opacity-85 mt-0.5">
-                  {apiKeyConfigured
-                    ? 'Conectado con cuota oficial de Google Cloud'
-                    : 'Agrega GOOGLE_BOOKS_API_KEY en apps/web/.env.local'}
-                </p>
+            {/* Indicador de Estado de API Key + Botón Sincronizar */}
+            <div className="flex flex-wrap items-center gap-3 shrink-0">
+              <div
+                className={`px-4 py-2.5 rounded-2xl border flex items-center gap-3 ${
+                  apiKeyConfigured
+                    ? 'border-emerald-200/80 bg-emerald-50/60 dark:border-emerald-900/50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300'
+                    : 'border-amber-300/80 bg-amber-50/70 dark:border-amber-800/60 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300'
+                }`}
+              >
+                <KeyRound size={16} className="shrink-0" />
+                <div className="text-xs">
+                  <p className="font-bold">
+                    {apiKeyConfigured ? 'GOOGLE_BOOKS_API_KEY Activa' : 'API Key Pendiente en .env.local'}
+                  </p>
+                  <p className="text-[11px] opacity-85">
+                    {apiKeyConfigured
+                      ? 'Cuota oficial de Google Cloud'
+                      : 'Agrega GOOGLE_BOOKS_API_KEY'}
+                  </p>
+                </div>
               </div>
+
+              <button
+                type="button"
+                onClick={() => fetchGoogleBooks()}
+                disabled={loading}
+                className="inline-flex items-center gap-1.5 px-4 py-3 rounded-2xl bg-stone-900 text-cream-50 dark:bg-cream-100 dark:text-stone-900 text-xs font-semibold hover:opacity-90 transition-all cursor-pointer disabled:opacity-50"
+              >
+                <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
+                <span>Sincronizar API</span>
+              </button>
             </div>
           </div>
 

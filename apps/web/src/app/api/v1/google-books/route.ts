@@ -1576,6 +1576,36 @@ export async function POST(request: NextRequest) {
     // 3. Guardar metadatos y todas las páginas en MongoDB Atlas; la portada se mantiene por URL de API
     const ahora = new Date().toISOString();
     const isbn = book.isbn || `GBOOKS-${book.gutenbergId || book.googleBookId}`;
+    const actorName =
+      verification.payload?.nombre ||
+      verification.payload?.username ||
+      'Administrador';
+
+    let existingDoc: Record<string, unknown> | null = null;
+    if (process.env.MONGO_URI?.trim()) {
+      try {
+        const colLibros = await getLibrosCollection();
+        existingDoc = await colLibros.findOne(
+          {
+            $or: [
+              { google_book_id: book.googleBookId },
+              { isbn_o_codigo: isbn },
+              { isbn },
+              { titulo: book.title },
+            ],
+          },
+          { projection: { _id: 1, fecha_subida: 1, fecha_procesamiento: 1, subido_por: 1 } }
+        );
+      } catch {
+        // continuar
+      }
+    }
+
+    const isUpdate = Boolean(existingDoc);
+    const fechaSubidaOriginal =
+      (typeof existingDoc?.fecha_subida === 'string' && existingDoc.fecha_subida) ||
+      (typeof existingDoc?.fecha_procesamiento === 'string' && existingDoc.fecha_procesamiento) ||
+      ahora;
 
     const docToSave: Record<string, unknown> = {
       google_book_id: book.googleBookId,
@@ -1607,8 +1637,14 @@ export async function POST(request: NextRequest) {
         webReaderLink: book.webReaderLink,
         epubDownloadLink: book.epubDownloadLink,
       },
+      fecha_subida: fechaSubidaOriginal,
+      fecha_procesamiento: fechaSubidaOriginal,
       fecha_actualizacion: ahora,
-      fecha_procesamiento: ahora,
+      fecha_ultima_modificacion: isUpdate ? ahora : null,
+      fue_actualizado: isUpdate,
+      subido_por:
+        (typeof existingDoc?.subido_por === 'string' && existingDoc.subido_por) || actorName,
+      ...(isUpdate ? { actualizado_por: actorName } : {}),
     };
 
     let upserted = true;

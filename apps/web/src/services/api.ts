@@ -154,6 +154,37 @@ export async function getBooksApi(params?: {
 }
 
 /**
+ * Obtiene el registro completo de libros para la Bitácora Bibliográfica
+ * (incluyendo fechas de subida, fechas de actualización y todos sus metadatos).
+ */
+export async function getBooksBitacoraApi(): Promise<{
+  books: Book[];
+  total: number;
+  online: boolean;
+}> {
+  const firstBatch = await getBooksApi({ limit: 200, skip: 0 });
+  if (!firstBatch.online) {
+    return { books: [], total: 0, online: false };
+  }
+
+  const allBooks = [...firstBatch.books];
+  let currentSkip = allBooks.length;
+
+  while (currentSkip < firstBatch.total && currentSkip < 600) {
+    const nextBatch = await getBooksApi({ limit: 200, skip: currentSkip });
+    if (!nextBatch.online || nextBatch.books.length === 0) break;
+    allBooks.push(...nextBatch.books);
+    currentSkip += nextBatch.books.length;
+  }
+
+  return {
+    books: allBooks,
+    total: Math.max(firstBatch.total, allBooks.length),
+    online: true,
+  };
+}
+
+/**
  * Obtiene un bloque de páginas desde el detalle completo del libro.
  * La API publicada entrega el contenido en el endpoint de detalle.
  */

@@ -18,11 +18,15 @@ import {
   Save,
   Loader2,
   AlertCircle,
+  ClipboardList,
+  History,
+  CheckCircle2,
 } from 'lucide-react';
 import { useReadingProgress } from './hooks/useReadingProgress';
 import { useAuth } from '@/context/AuthContext';
 import { deleteBookApi, updateBookApi } from '@/services/api';
 import { formatBookSynopsis } from '@/lib/synopsisFormatter';
+import { formatBitacoraDate } from './BookBitacoraModal';
 
 interface BookDetailModalProps {
   book: Book;
@@ -65,6 +69,9 @@ export function BookDetailModal({
 
   const primaryGenre = book.genres?.[0] || 'Clásicos';
   const hasCover = Boolean(book.coverUrl && !imageError);
+  const uploadDateInfo = formatBitacoraDate(book.uploadedAt);
+  const updateDateInfo =
+    book.wasUpdated && book.updatedAt ? formatBitacoraDate(book.updatedAt) : null;
 
   // Bloquear el scroll del fondo mientras el modal está abierto y cerrar con Escape
   useEffect(() => {
@@ -218,7 +225,7 @@ export function BookDetailModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="book-detail-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 lg:p-8 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto"
+      className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-6 lg:p-8 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto"
     >
       <div
         className="relative w-full max-w-5xl my-auto bg-cream-50 dark:bg-surface-100 rounded-3xl border border-stone-200/90 dark:border-surface-300 shadow-2xl overflow-hidden flex flex-col md:flex-row text-stone-900 dark:text-stone-100 animate-in zoom-in-95 duration-200"
@@ -511,6 +518,85 @@ export function BookDetailModal({
                       >
                         {book.isbn || 'N/A'}
                       </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Registro en Bitácora (Fecha de Subida, Estado y Fecha de Actualización) */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400 flex items-center gap-1.5">
+                      <ClipboardList size={13} className="text-terracotta-600 dark:text-terracotta-400" />
+                      <span>Registro en Bitácora</span>
+                    </h3>
+                    <span className="text-[11px] font-mono text-stone-500 dark:text-stone-400">
+                      Origen: {book.origin || 'Archivo Babilon'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="p-3 rounded-xl border border-stone-200/80 dark:border-surface-300 bg-cream-100/70 dark:bg-surface-200/60">
+                      <div className="flex items-center justify-between text-[11px] text-stone-500 dark:text-stone-400 mb-0.5">
+                        <span className="inline-flex items-center gap-1 font-medium">
+                          <Calendar size={12} className="text-emerald-600 dark:text-emerald-400" />
+                          Fecha de Subida
+                        </span>
+                        {uploadDateInfo && (
+                          <span className="font-mono text-[10px] text-emerald-700 dark:text-emerald-400">
+                            {uploadDateInfo.relative}
+                          </span>
+                        )}
+                      </div>
+                      <p className="font-mono text-xs font-semibold text-stone-900 dark:text-stone-100">
+                        {uploadDateInfo ? uploadDateInfo.fullLabel : 'Registrado en catálogo'}
+                      </p>
+                      {book.uploadedBy && (
+                        <p className="text-[10px] text-stone-500 dark:text-stone-400 mt-0.5">
+                          Registrado por: {book.uploadedBy}
+                        </p>
+                      )}
+                    </div>
+
+                    <div
+                      className={`p-3 rounded-xl border ${
+                        updateDateInfo
+                          ? 'border-amber-200/90 dark:border-amber-800/50 bg-amber-50/70 dark:bg-amber-950/30'
+                          : 'border-stone-200/80 dark:border-surface-300 bg-cream-100/70 dark:bg-surface-200/60'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between text-[11px] text-stone-500 dark:text-stone-400 mb-0.5">
+                        <span className="inline-flex items-center gap-1 font-medium">
+                          <History
+                            size={12}
+                            className={
+                              updateDateInfo
+                                ? 'text-amber-600 dark:text-amber-400'
+                                : 'text-stone-400'
+                            }
+                          />
+                          Fecha de Actualización
+                        </span>
+                        {updateDateInfo ? (
+                          <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-semibold bg-amber-200/80 dark:bg-amber-900/60 text-amber-900 dark:text-amber-200">
+                            Actualizado
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-mono text-emerald-700 dark:text-emerald-400">
+                            <CheckCircle2 size={11} />
+                            Original
+                          </span>
+                        )}
+                      </div>
+                      <p className="font-mono text-xs font-semibold text-stone-900 dark:text-stone-100">
+                        {updateDateInfo
+                          ? updateDateInfo.fullLabel
+                          : 'Sin actualizaciones posteriores'}
+                      </p>
+                      {updateDateInfo && book.updatedBy && (
+                        <p className="text-[10px] text-amber-800/90 dark:text-amber-300/90 mt-0.5">
+                          Modificado por: {book.updatedBy}
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>

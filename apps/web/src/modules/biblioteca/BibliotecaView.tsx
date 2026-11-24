@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -9,10 +9,7 @@ import {
   RefreshCw,
   Library,
   Feather,
-  UploadCloud,
   CheckCircle2,
-  ArrowLeft,
-  Sparkles,
   ChevronLeft,
   ChevronRight,
   AlertCircle,
@@ -20,6 +17,7 @@ import {
 
 import { BookCard } from './BookCard';
 import { BookDetailModal } from './BookDetailModal';
+import { BookBitacoraModal } from './BookBitacoraModal';
 import { Book } from '@babilon/shared-types';
 import { CatalogFilterDropdown } from './CatalogFilterDropdown';
 import { BookReader } from './BookReader';
@@ -58,7 +56,27 @@ export function BibliotecaView() {
   const searchParams = useSearchParams();
   const catalogSectionRef = useRef<HTMLElement | null>(null);
   const [selectedDetailBook, setSelectedDetailBook] = useState<Book | null>(null);
+  const [isBitacoraOpen, setIsBitacoraOpen] = useState(false);
+  const [bitacoraRefreshVersion, setBitacoraRefreshVersion] = useState(0);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (searchParams.get('bitacora') === '1') {
+      setIsBitacoraOpen(true);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    const handleOpenBitacoraEvent = () => setIsBitacoraOpen(true);
+    window.addEventListener('babilon:open-bitacora', handleOpenBitacoraEvent);
+    return () => window.removeEventListener('babilon:open-bitacora', handleOpenBitacoraEvent);
+  }, []);
+
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent('babilon:bitacora-state', { detail: { open: isBitacoraOpen } })
+    );
+  }, [isBitacoraOpen]);
 
   const initialPageParam = Number(searchParams.get('page') ?? '1');
 
@@ -133,67 +151,30 @@ export function BibliotecaView() {
     <div className="min-h-screen bg-cream-100 dark:bg-surface-50 text-stone-900 dark:text-stone-100 selection:bg-terracotta-100 selection:text-terracotta-900 font-sans pb-16 transition-colors duration-200">
       {/* Toast Alert */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3 bg-stone-900 text-stone-50 dark:bg-surface-100 dark:text-stone-100 rounded-xl shadow-lg border border-stone-800 dark:border-surface-300 animate-fade-in max-w-md">
+        <div className="fixed bottom-6 left-6 z-50 flex items-center gap-3 px-5 py-3 bg-stone-900 text-stone-50 dark:bg-surface-100 dark:text-stone-100 rounded-xl shadow-lg border border-stone-800 dark:border-surface-300 animate-fade-in max-w-md">
           <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
           <span className="text-xs font-medium">{toastMessage}</span>
         </div>
       )}
 
-      {/* Subheader / Breadcrumb Bar */}
-      <div className="bg-cream-50/80 dark:bg-surface-100 border-b border-stone-200/80 dark:border-surface-300 py-3.5 px-4 sm:px-6 lg:px-8 transition-colors duration-200">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link
-              href="/"
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 transition-colors"
-            >
-              <ArrowLeft size={14} />
-              <span>Volver a Inicio</span>
-            </Link>
-            <span className="text-stone-300 dark:text-surface-400">/</span>
-            <span className="text-xs font-semibold text-stone-900 dark:text-stone-100 uppercase tracking-wider font-mono">
-              Biblioteca Digital
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2.5">
-            {catalog.health && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 text-xs font-medium border border-emerald-200 dark:border-emerald-800">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                Catálogo: {totalDisplayedCount} {totalDisplayedCount === 1 ? 'obra' : 'obras'}
-              </span>
-            )}
-
-            {isAdmin && (
-              <>
-                <Link
-                  href="/explorar-libres"
-                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-terracotta-50 text-terracotta-800 hover:bg-terracotta-100 dark:bg-terracotta-950/50 dark:text-terracotta-300 dark:hover:bg-terracotta-900/50 border border-terracotta-200 dark:border-terracotta-800/60 text-xs font-semibold shadow-subtle transition-all cursor-pointer"
-                >
-                  <Sparkles size={14} className="text-terracotta-600 dark:text-terracotta-400" />
-                  <span>Obras Libres (API)</span>
-                </Link>
-                <Link
-                  href="/subir"
-                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-stone-900 text-cream-50 hover:bg-stone-800 dark:bg-cream-100 dark:text-stone-900 dark:hover:bg-cream-50 text-xs font-semibold shadow-subtle transition-all cursor-pointer"
-                >
-                  <UploadCloud size={14} />
-                  <span>Digitalizar Obra</span>
-                </Link>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-
       {/* Hero & Search Header */}
-      <section className="bg-cream-50/70 dark:bg-surface-100 border-b border-stone-200/80 dark:border-surface-300 py-10 px-4 sm:px-6 lg:px-8 transition-colors duration-200">
+      <section className="bg-cream-50/70 dark:bg-surface-100 border-b border-stone-200/80 dark:border-surface-300 py-8 sm:py-10 px-4 sm:px-6 lg:px-8 transition-colors duration-200">
         <div className="max-w-7xl mx-auto">
-          <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-cream-200 dark:bg-surface-200 text-stone-700 dark:text-stone-300 text-xs font-semibold uppercase tracking-wider border border-stone-200/80 dark:border-surface-300 mb-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+            <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-cream-200 dark:bg-surface-200 text-stone-700 dark:text-stone-300 text-xs font-semibold uppercase tracking-wider border border-stone-200/80 dark:border-surface-300">
               <Library size={13} className="text-terracotta-600 dark:text-terracotta-500" />
               <span>Catálogo & Preservación Activa</span>
             </div>
+
+            {catalog.health && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 text-xs font-medium border border-emerald-200 dark:border-emerald-800">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                Catálogo activo: {totalDisplayedCount} {totalDisplayedCount === 1 ? 'obra' : 'obras'}
+              </span>
+            )}
+          </div>
+
+          <div className="max-w-3xl">
             <h1 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold text-stone-900 dark:text-stone-50 tracking-tight leading-tight">
               Archivo Bibliográfico Babilon
             </h1>
@@ -396,19 +377,34 @@ export function BibliotecaView() {
         )}
       </section>
 
-      {/* Modal de Detalle de Obra */}
+      {/* Modal de Bitácora de Libros */}
+      <BookBitacoraModal
+        isOpen={isBitacoraOpen}
+        onClose={() => setIsBitacoraOpen(false)}
+        initialBooks={catalog.books}
+        onSelectBook={(book) => setSelectedDetailBook(book)}
+        isDetailModalOpen={Boolean(selectedDetailBook)}
+        refreshVersion={bitacoraRefreshVersion}
+      />
+
+      {/* Modal de Detalle de Obra (se superpone a la bitácora si fue abierta desde ahí, y al cerrarse regresa a la bitácora) */}
       {selectedDetailBook && (
         <BookDetailModal
           book={selectedDetailBook}
           onClose={() => setSelectedDetailBook(null)}
-          onRead={openBook}
+          onRead={(book) => {
+            setIsBitacoraOpen(false);
+            openBook(book);
+          }}
           onBookUpdated={() => {
             showToast('¡Metadatos de la obra actualizados exitosamente!');
             refreshBooks();
+            setBitacoraRefreshVersion((v) => v + 1);
           }}
           onBookDeleted={() => {
             showToast('Obra eliminada de la base de datos.');
             refreshBooks();
+            setBitacoraRefreshVersion((v) => v + 1);
           }}
         />
       )}

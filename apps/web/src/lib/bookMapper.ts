@@ -3,6 +3,32 @@ import { formatBookSynopsis } from '@/lib/synopsisFormatter';
 
 const DEFAULT_COVER_URL = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=600&q=80';
 
+function extractObjectIdIsoDate(rawId: unknown): string | undefined {
+  if (!rawId) return undefined;
+  const idStr = String(rawId).trim();
+  if (/^[0-9a-fA-F]{24}$/.test(idStr)) {
+    const timestampSeconds = parseInt(idStr.slice(0, 8), 16);
+    if (Number.isFinite(timestampSeconds) && timestampSeconds > 946684800) {
+      return new Date(timestampSeconds * 1000).toISOString();
+    }
+  }
+  return undefined;
+}
+
+function normalizeIsoDate(value: unknown): string | undefined {
+  if (!value) return undefined;
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString();
+  }
+  if (typeof value === 'string' || typeof value === 'number') {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toISOString();
+    }
+  }
+  return undefined;
+}
+
 export function normalizeCoverUrl(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
 
@@ -107,11 +133,47 @@ export function normalizeBook(doc: Record<string, any>): Book {
     normalizeCoverUrl(doc.portada) ??
     DEFAULT_COVER_URL;
 
+  const rawId = doc._id ?? doc.id ?? doc.isbn ?? Math.random().toString();
+  const objectIdDate = extractObjectIdIsoDate(doc._id ?? doc.id);
+
+  const uploadedAt =
+    normalizeIsoDate(doc.fecha_subida) ??
+    normalizeIsoDate(doc.fecha_creacion) ??
+    normalizeIsoDate(doc.createdAt) ??
+    normalizeIsoDate(doc.fecha_procesamiento) ??
+    objectIdDate ??
+    normalizeIsoDate(doc.fecha_actualizacion);
+
+  const rawUpdatedAt =
+    normalizeIsoDate(doc.fecha_ultima_modificacion) ??
+    normalizeIsoDate(doc.updatedAt) ??
+    normalizeIsoDate(doc.fecha_actualizacion);
+
+  let wasUpdated = Boolean(doc.fue_actualizado ?? doc.wasUpdated);
+  if (!wasUpdated && uploadedAt && rawUpdatedAt) {
+    const diffMs = new Date(rawUpdatedAt).getTime() - new Date(uploadedAt).getTime();
+    if (diffMs > 2000) {
+      wasUpdated = true;
+    }
+  }
+
+  const updatedAt = wasUpdated ? (rawUpdatedAt ?? null) : null;
+
+  const rawOrigin = doc.origen_datos ?? doc.origin ?? doc.metadatos_adicionales?.origen;
+  const origin =
+    rawOrigin === 'google_books_api' || doc.google_book_id
+      ? 'Google Books API'
+      : rawOrigin === 'digitalizacion_local'
+        ? 'Digitalización Local'
+        : typeof rawOrigin === 'string' && rawOrigin.trim()
+          ? rawOrigin.trim()
+          : 'Archivo Babilon';
+
   return {
-    id: String(doc._id ?? doc.id ?? doc.isbn ?? Math.random().toString()),
+    id: String(rawId),
     title: doc.titulo ?? doc.title ?? 'Sin título',
     originalTitle: doc.subtitulo || doc.originalTitle || doc.titulo,
-    isbn: doc.isbn ?? 'N/A',
+    isbn: doc.isbn ?? doc.isbn_o_codigo ?? 'N/A',
     author,
     genres,
     synopsis,
@@ -119,7 +181,7 @@ export function normalizeBook(doc: Record<string, any>): Book {
     publisher: doc.editorial ?? doc.publisher ?? 'Editorial Babilon',
     pageCount: Number(doc.total_paginas ?? doc.pageCount ?? (pages.length > 0 ? pages.length : 0)),
     language: doc.idioma ?? doc.language ?? 'Español',
-    catalogType: doc.metadatos_adicionales?.tipo_libro || doc.catalogType || 'Digitalizado',
+    catalogType: doc.tipo_libro || doc.metadatos_adicionales?.tipo_libro || doc.catalogType || 'Digitalizado',
     coverUrl,
     ratingAverage: Number(doc.calificacion?.promedio ?? doc.ratingAverage ?? 4.8),
     ratingCount: Number(doc.calificacion?.total_votos ?? doc.ratingCount ?? 120),
@@ -129,5 +191,11 @@ export function normalizeBook(doc: Record<string, any>): Book {
     pages,
     stock: Number(doc.stock ?? 10),
     featured: Boolean(doc.destacado ?? doc.featured ?? true),
+    uploadedAt,
+    updatedAt,
+    wasUpdated,
+    origin,
+    uploadedBy: typeof doc.subido_por === 'string' ? doc.subido_por : undefined,
+    updatedBy: typeof doc.actualizado_por === 'string' ? doc.actualizado_por : undefined,
   };
 }
